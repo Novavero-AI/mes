@@ -115,10 +115,10 @@ main (int argc, char **argv)
   a = __ntdll (NT_WOW64READVM); b = __ntdll_resolve ("NtWow64ReadVirtualMemory64");
   if (a != b) { eputs ("MISMATCH NtWow64ReadVirtualMemory64\n"); ok = 0; }
 
-  /* NT_CLONE (RtlCloneUserProcess) is deliberately skipped above: Wine's
-   * ntdll has no such export, and this VM's outcome for it is not the
-   * point being checked here.  A genuinely made-up name is checked instead,
-   * to confirm a miss returns 0 rather than the last thing found. */
+  /* NT_CLONE (RtlCloneUserProcess) is not checked above: nothing in this
+   * port calls it, and Wine's ntdll has no such export.  A genuinely
+   * made-up name is checked instead, to confirm a miss returns 0 rather
+   * than the last thing found. */
   b = __ntdll_resolve ("NtThisExportDoesNotExist");
   if (b != 0) { eputs ("MISMATCH: bogus name resolved to something\n"); ok = 0; }
 
