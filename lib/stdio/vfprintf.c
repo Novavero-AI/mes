@@ -40,6 +40,7 @@ vfprintf (FILE * f, char const *format, va_list ap)
         p++;
         char c = *p;
         int left_p = 0;
+        int long_p = 0;
         int precision = -1;
         int width = -1;
         if (c == '-')
@@ -83,7 +84,10 @@ vfprintf (FILE * f, char const *format, va_list ap)
               }
           }
         if (c == 'l')
-          c = *++p;
+          {
+            long_p = 1;
+            c = *++p;
+          }
         if (c == 'l')
           {
             eputs ("vfprintf: skipping second: l\n");
@@ -111,7 +115,13 @@ vfprintf (FILE * f, char const *format, va_list ap)
           case 'x':
           case 'X':
             {
-              long d = va_arg (ap, long);
+              long d;
+              if (long_p)
+                d = va_arg (ap, long);
+              else if (c == 'd' || c == 'i')
+                d = (long) va_arg (ap, int);
+              else
+                d = (long) va_arg (ap, unsigned int);
               int base = c == 'o' ? 8 : c == 'x' || c == 'X' ? 16 : 10;
               char *s = ntoab (d, base, c != 'u' && c != 'x' && c != 'X');
               if (c == 'X')
