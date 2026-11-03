@@ -36,7 +36,7 @@
 #define TCGETS 0x5401
 
 int
-ioctl3 (int filedes, size_t command, long data)
+ioctl3 (int filedes, unsigned long command, long data)
 {
   int NtQueryVolumeInformationFile;
   int *iosb;

@@ -52,7 +52,7 @@ int fdputc (int c, int fd);
 int fdputs (char const *s, int fd);
 int fdungetc (int c, int fd);
 char *_getcwd (char *buffer, size_t size);
-int ioctl3 (int filedes, size_t command, long data);
+int ioctl3 (int filedes, unsigned long command, long data);
 int isnumber (int c, int base);
 int mes_open (char const *file_name, int flags, int mask);
 int _open2 (char const *file_name, int flags);
