@@ -22,33 +22,24 @@
  *
  * Windows has no syscall a program may make directly, so there is no
  * _sys_call here for lib/windows/ to be thin wrappers over the way
- * lib/linux/ is over int $0x80.  What there is instead, for most of this
- * file's own history, was this: lib/m2/x86/ntdll-i386.hex2 finds ntdll
- * through the PEB before main runs and resolves the routines this needs out
- * of its export table by name, into a table of addresses, and __ntdll hands
- * one back by index.
+ * lib/linux/ is over int $0x80.  Instead, __ntdll_resolve (name) walks this
+ * process's own PEB -> Ldr -> module list and ntdll's export table,
+ * in-process, and hands back the routine's address.  It is ported from
+ * stage0-pe32's M2libc fork (M2libc/x86/windows/ntdll.c), which measured it
+ * byte-identical to lib/m2/x86/ntdll-i386.hex2's table for every routine
+ * this port calls.
  *
- * Every caller below now reaches ntdll a different way instead:
- * __ntdll_resolve (name) walks this process's own PEB -> Ldr -> module list
- * and ntdll's own export table itself, in-process, and hands back the same
- * kind of address __ntdll (slot) did.  Ported from stage0-pe32's M2libc fork
- * (M2libc/x86/windows/ntdll.c), which measured it byte-identical to the
- * index table for every routine this port ever calls.  __ntdll (slot) and
- * lib/windows/ntdll.h's NT_* constants stay in place below --
- * lib/m2/x86/ntdll-i386.hex2 still fills the same table for the
- * hand-assembled stages before this file's own C exists to call
- * __ntdll_resolve -- but nothing compiled from C in this port calls __ntdll
- * by slot any more.
+ * That table is filled before main runs, and __ntdll (slot) in
+ * lib/windows/<arch>-mes-<compiler>/ntlow.c hands back one of its entries
+ * by index; include/windows/ntdll.h's NT_* constants name them.  Only
+ * scaffold/ntdll-resolve-test.c calls __ntdll, to check __ntdll_resolve
+ * against it.
  *
- * Either way, the call itself goes through __ntcallN -- see
- * <windows/ntcall.h>.  Calling ntdll directly is not a thing this file, or
- * any file in lib/windows/, does any more: ntdll is stdcall, and what that
- * costs depends on which compiler is building, so it is settled in one place
- * per compiler instead of at every call site.  A caller writes the arguments
- * in the order the routine documents and nothing else.
- *
- * The routine at each index is decided by lib/m2/x86/ntdll-i386.hex2, and
- * lib/windows/ntdll.h names them.
+ * Every call goes through __ntcallN (see <windows/ntcall.h>), never to
+ * ntdll directly: ntdll is stdcall, and what that costs depends on which
+ * compiler is building, so it is settled in one place per compiler instead
+ * of at every call site.  A caller writes the arguments in the order the
+ * routine documents and nothing else.
  *
  * Filenames: ntdll takes UTF-16, inside an OBJECT_ATTRIBUTES around a
  * UNICODE_STRING, and for a file on disk it wants an NT path (\??\C:\...)
