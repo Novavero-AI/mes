@@ -23,7 +23,7 @@
 #include <mes/lib.h>
 
 int
-ioctl3 (int filedes, size_t command, long data)
+ioctl3 (int filedes, unsigned long command, long data)
 {
   long long_filedes = cast_int_to_long (filedes);
   int r = _sys_call3 (SYS_ioctl, long_filedes, command, data);
