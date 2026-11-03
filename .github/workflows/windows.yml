@@ -1,0 +1,112 @@
+name: Windows
+
+on:
+  push:
+    branches: [windows-pe32-ntcall]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # The stage0-pe32 commit nova-nix builds its Windows stage0 from.
+  STAGE0_PE32: 28ec2d263dc144b674250c9939f2df66d2f67120
+
+jobs:
+  mes-m2:
+    name: mes-m2 on ${{ matrix.os }}
+    # mes-m2 is 32-bit x86: x64 Windows runs it through WOW64 and ARM64
+    # Windows through its x86 emulator. Each can fail where the other does
+    # not, so one failing does not cancel the other.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      # The runner's Git rewrites line endings on checkout, and the tools
+      # have to read the bytes that were committed.
+      - name: Keep committed line endings
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Novavero-AI/stage0-pe32
+          ref: ${{ env.STAGE0_PE32 }}
+          path: stage0-pe32
+          submodules: recursive
+
+      - name: Build the stage0-pe32 chain
+        shell: cmd
+        run: stage0-pe32\x86\mescc-tools-mini.cmd
+
+      # kaem.windows.run calls mkdir, which the chain does not build.
+      # mescc-tools-extra's is built the way the chain builds kaem: M2-Planet,
+      # catm, M0, catm and hex2, on M2libc's x86/windows target.
+      - name: Build mkdir
+        shell: pwsh
+        working-directory: stage0-pe32/x86
+        run: |
+          function step { & $args[0] @($args | Select-Object -Skip 1); if ($LASTEXITCODE -ne 0) { throw "$($args[0]) exited $LASTEXITCODE" } }
+          $libc = 'sys/types.h', 'stddef.h', 'sys/utsname.h', 'x86/windows/ntdll.c',
+            'x86/windows/unistd.c', 'x86/windows/process.c', 'x86/windows/fcntl.c', 'fcntl.c',
+            'x86/windows/sys/stat.c', 'ctype.c', 'stdlib.c', 'string.c', 'stdarg.h', 'stdio.h',
+            'stdio.c', 'bootstrappable.c' | ForEach-Object { '-f'; "../M2libc/$_" }
+          step ./artifact/M2.exe --architecture x86 -D __windows__=1 @libc `
+            -f ../mescc-tools-extra/mkdir.c -o artifact/mkdir.M1
+          step ./artifact/catm.exe artifact/mkdir-0.M1 ../M2libc/x86/x86_defs.M1 `
+            libc-core.M1 libc-full.M1 artifact/mkdir.M1 pe-end-shim.M1
+          step ./artifact/M0.exe artifact/mkdir-0.M1 artifact/mkdir.hex2
+          step ./artifact/catm.exe artifact/mkdir-0.hex2 PE32-i386.hex2 ntdll-i386.hex2 `
+            artifact/mkdir.hex2
+          step ./artifact/hex2.exe artifact/mkdir-0.hex2 artifact/mkdir.exe
+
+      # Under the names kaem.windows.run calls them by. Its hex2 is hex2-new,
+      # the C one that takes --base-address, not the chain's hand-written one.
+      - name: Gather the tools
+        shell: pwsh
+        run: |
+          $bin = (New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/stage0-bin").FullName
+          $art = 'stage0-pe32/x86/artifact'
+          Copy-Item "$art/M2.exe" "$bin/M2-Planet.exe"
+          Copy-Item "$art/M1.exe" "$bin/M1.exe"
+          Copy-Item "$art/hex2-new.exe" "$bin/hex2.exe"
+          Copy-Item "$art/kaem.exe" "$bin/kaem.exe"
+          Copy-Item "$art/mkdir.exe" "$bin/mkdir.exe"
+          "STAGE0_BIN=$bin" >> $env:GITHUB_ENV
+
+      # What configure.sh writes for Mes's own C library.
+      - name: Write include/mes/config.h
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path configure.sh -Pattern '^VERSION=(.+)$').Matches[0].Groups[1].Value
+          [IO.File]::WriteAllText("$PWD/include/mes/config.h", "#undef SYSTEM_LIBC`n#define MES_VERSION `"$version`"`n")
+
+      # PATH holds the chain's tools and nothing else, so nothing outside it
+      # takes part in the build.
+      - name: Build mes-m2 with kaem.windows.run
+        shell: pwsh
+        run: |
+          $env:PATH = $env:STAGE0_BIN
+          & "$env:STAGE0_BIN/kaem.exe" --verbose --strict --file kaem.windows.run
+          if ($LASTEXITCODE -ne 0) { throw "kaem exited $LASTEXITCODE" }
+
+      - name: mes-m2 boots
+        shell: pwsh
+        run: |
+          ./bin/mes-m2.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "mes-m2 --version exited $LASTEXITCODE" }
+
+      # The child's line has to reach this process's output, since a spawned
+      # child inherits its parent's handles.
+      - name: system* spawns
+        shell: pwsh
+        run: |
+          $out = ./bin/mes-m2.exe scaffold/spawn.scm bin/mes-m2.exe
+          $code = $LASTEXITCODE
+          $out
+          if ($code -ne 0) { throw "scaffold/spawn.scm exited $code" }
+          if ($out -notcontains 'spawned') { throw "the child's line is missing from the output" }
