@@ -37,8 +37,8 @@
 // FIXME: M2-Planet 1.10.0 crashes on this...
 // #if __M2__ || (!defined (__MESC__and__arm__) && !defined (__TINYC__and__arm__and__BOOTSTRAP))
 #if __M2__ || __not__MESC__arm__and__not__TINYC__arm__BOOTSTRAP
-size_t
-__mesabi_uldiv (size_t a, size_t b, size_t *remainder)
+unsigned long
+__mesabi_uldiv (unsigned long a, unsigned long b, unsigned long *remainder)
 {
   remainder[0] = a % b;
   return a / b;
@@ -57,9 +57,9 @@ ntoab (long x, unsigned base, int signed_p)
   assert_msg (base >= 8, "base >= 8");
 
   int sign_p = 0;
-  size_t i;
-  size_t u;
-  size_t b = base;
+  unsigned long i;
+  unsigned long u;
+  unsigned long b = base;
   if (signed_p != 0 && x < 0)
     {
       sign_p = 1;
