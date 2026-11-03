@@ -84,6 +84,7 @@ M2-Planet                                               \
     -f ${srcdest}lib/linux/malloc.c                    \
     -f ${srcdest}lib/windows/ntdll.c                   \
     -f ${srcdest}lib/string/memset.c                   \
+    -f ${srcdest}lib/windows/_read.c                   \
     -f ${srcdest}lib/windows/read.c                    \
     -f ${srcdest}lib/mes/fdgetc.c                      \
     -f ${srcdest}lib/stdio/getchar.c                   \

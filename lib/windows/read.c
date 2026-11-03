@@ -16,32 +16,16 @@
  * You should have received a copy of the GNU General Public License
  * along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <windows/ntcall.h>
-#include <windows/ntdll.h>
 #include <mes/lib.h>
 #include <fcntl.h>
 
-/* Stands in for lib/linux/read.c.  NtReadFile is NtWriteFile's twin, and an
- * NTSTATUS below zero is how the end of the file arrives as much as how a
- * failure does -- both mean nothing more was read, which is what a caller of
- * read wants to hear as 0. */
+/* Stands in for lib/linux/read.c, for a build that buffers nothing, as
+ * kaem.windows.run's does: there read is lib/windows/_read.c's bare
+ * NtReadFile.  configure-lib.sh's lists take read from
+ * lib/posix/buffered-read.c instead, and do not build this file. */
 
 ssize_t
 read (int filedes, void *buffer, size_t size)
 {
-  int NtReadFile;
-  int *iosb;
-  int handle;
-  int rc;
-
-  NtReadFile = __ntdll_resolve ("NtReadFile");
-  iosb = __iosb ();
-  iosb[0] = 0;
-  iosb[1] = 0;
-  handle = __handle (filedes);
-
-  rc = __ntcall9 (NtReadFile, handle, 0, 0, 0, iosb, buffer, size, 0, 0);
-  if (rc < 0)
-    return 0;
-  return iosb[1];
+  return _read (filedes, buffer, size);
 }
