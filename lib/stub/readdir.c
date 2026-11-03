@@ -19,11 +19,11 @@
  */
 
 #include <mes/lib.h>
+#include <dirent.h>
 #include <errno.h>
-#include <unistd.h>
 
-int
-readir (DIR *dirstream)
+struct dirent *
+readdir (DIR *dir)
 {
   static int stub = 0;
   if (__mes_debug () && !stub)
