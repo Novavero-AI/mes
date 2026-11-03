@@ -303,7 +303,6 @@ lib/windows/$mes_cpu-mes-$compiler/filetime.c
 lib/windows/gettimeofday.c
 lib/windows/ioctl3.c
 lib/stub/link.c
-lib/windows/lseek.c
 lib/stub/lstat.c
 lib/windows/_open3.c
 lib/linux/malloc.c
