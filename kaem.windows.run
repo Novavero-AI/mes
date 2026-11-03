@@ -35,8 +35,12 @@
 #   lib/windows/ rather than lib/linux/.  Windows has no syscall a program may
 #   make directly, so there is no _sys_call for those files to be thin
 #   wrappers over.  Each of them calls into ntdll instead; see
-#   lib/windows/x86-mes-m2/ntdll.c for how, and for the two rules that come
-#   with it.
+#   lib/windows/ntdll.c for how.
+#
+#   lib/windows/x86-mes/argv.M1 and defs.M1 ahead of crt1.M1, and
+#   lib/windows/x86-mes/pe-end.M1 last.  Windows hands a program one UTF-16
+#   command line rather than argc, argv and an environment on the stack, and
+#   argv.M1 builds those before crt1.M1 calls main.
 #
 #   lib/m2/x86/PE32-i386.hex2 and lib/m2/x86/ntdll-i386.hex2 rather than
 #   lib/m2/x86/ELF-x86.hex2.  The first is the PE header; the second finds
@@ -61,7 +65,10 @@ M2-Planet                                               \
     -f ${srcdest}include/mes/config.h                  \
     -f ${srcdest}include/mes/lib-mini.h                \
     -f ${srcdest}include/mes/lib.h                     \
-    -f ${srcdest}include/windows/${mes_cpu}-mes-m2/ntdll.h \
+    -f ${srcdest}include/windows/ntdll.h               \
+    -f ${srcdest}include/windows/ntcall.h              \
+    -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/ntlow.c \
+    -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/ntcall.c \
     -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/crt1.c  \
     -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/iosb.c  \
     -f ${srcdest}lib/mes/__init_io.c                   \
@@ -75,7 +82,7 @@ M2-Planet                                               \
     -f ${srcdest}lib/stub/__raise.c                    \
     -f ${srcdest}lib/windows/brk.c                     \
     -f ${srcdest}lib/linux/malloc.c                    \
-    -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/ntdll.c \
+    -f ${srcdest}lib/windows/ntdll.c                   \
     -f ${srcdest}lib/string/memset.c                   \
     -f ${srcdest}lib/windows/read.c                    \
     -f ${srcdest}lib/mes/fdgetc.c                      \
@@ -132,14 +139,16 @@ M2-Planet                                               \
     -f ${srcdest}include/sys/ioctl.h                   \
     -f ${srcdest}lib/m2/isatty.c                       \
     -f ${srcdest}include/signal.h                      \
-    -f ${srcdest}lib/windows/x86-mes-m2/wow64gate.c    \
-    -f ${srcdest}lib/windows/x86-mes-m2/wow64resolve.c \
+    -f ${srcdest}lib/windows/wow64gate.c               \
+    -f ${srcdest}lib/windows/wow64resolve.c            \
     -f ${srcdest}lib/windows/fork.c                    \
     -f ${srcdest}include/sys/resource.h                \
     -f ${srcdest}lib/windows/waitpid.c                 \
     -f ${srcdest}lib/windows/wait4.c                   \
     -f ${srcdest}lib/windows/execve.c                  \
     -f ${srcdest}lib/m2/execv.c                        \
+    -f ${srcdest}lib/windows/spawn.c                   \
+    -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/filetime.c \
     -f ${srcdest}lib/windows/gettimeofday.c            \
     -f ${srcdest}lib/windows/clock_gettime.c           \
     -f ${srcdest}lib/windows/time.c                    \
@@ -178,9 +187,11 @@ M1                                                      \
     --little-endian                                     \
     -f ${srcdest}lib/m2/${mes_cpu}/${mes_cpu}_defs.M1  \
     -f ${srcdest}lib/${mes_cpu}-mes/${mes_cpu}.M1      \
+    -f ${srcdest}lib/windows/${mes_cpu}-mes/defs.M1    \
+    -f ${srcdest}lib/windows/${mes_cpu}-mes/argv.M1    \
     -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/crt1.M1 \
     -f m2/mes.M1                                       \
-    -f ${srcdest}lib/windows/${mes_cpu}-mes-m2/pe-end.M1 \
+    -f ${srcdest}lib/windows/${mes_cpu}-mes/pe-end.M1  \
     -o m2/mes.hex2
 
 mkdir -p bin
