@@ -18,16 +18,16 @@
  * along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mes/lib.h>
+/* -1, not 0: 0 from fork tells the caller that it is the child.  system*
+   in mes/module/mes/posix.mes takes -1 to mean there is no fork, and
+   starts its program with spawn.  */
+
 #include <errno.h>
+#include <unistd.h>
 
 int
 fork ()
 {
-  static int stub = 0;
-  if (__mes_debug () && !stub)
-    eputs ("fork stub\n");
-  stub = 1;
-  errno = 0;
-  return 0;
+  errno = ENOSYS;
+  return -1;
 }

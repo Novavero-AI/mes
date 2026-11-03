@@ -139,9 +139,7 @@ M2-Planet                                               \
     -f ${srcdest}include/sys/ioctl.h                   \
     -f ${srcdest}lib/m2/isatty.c                       \
     -f ${srcdest}include/signal.h                      \
-    -f ${srcdest}lib/windows/wow64gate.c               \
-    -f ${srcdest}lib/windows/wow64resolve.c            \
-    -f ${srcdest}lib/windows/fork.c                    \
+    -f ${srcdest}lib/stub/fork.c                       \
     -f ${srcdest}include/sys/resource.h                \
     -f ${srcdest}lib/windows/waitpid.c                 \
     -f ${srcdest}lib/windows/wait4.c                   \

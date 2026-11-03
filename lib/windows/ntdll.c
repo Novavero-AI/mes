@@ -98,15 +98,13 @@ __ntdll_rb (int addr)
 
 /* Walk this process's own PEB -> Ldr -> InMemoryOrderModuleList for a module
  * named (ASCII) `want', matched against its UTF-16 BaseDllName one code unit
- * at a time -- the in-process, native-bitness counterpart of
- * wow64resolve.c's __wow64_find_module, needing no cross-bitness read since
- * this is the same process's own memory.  PEB->Ldr is at +0x0C and
- * Ldr->InMemoryOrderModuleList's head is at +0x14.  Walking the list keeps a
- * pointer to each entry's InMemoryOrderLinks field (LDR_DATA_TABLE_ENTRY
- * +0x08) rather than the entry's own base, which is why DllBase (real
- * offset +0x18) reads back at cur+0x10 and BaseDllName.Length/Buffer (real
- * offsets +0x2C/+0x30) at cur+0x24/+0x28 below.  Returns the module base, or
- * 0 if the (circular) list runs out first. */
+ * at a time.  PEB->Ldr is at +0x0C and Ldr->InMemoryOrderModuleList's head
+ * is at +0x14.  Walking the list keeps a pointer to each entry's
+ * InMemoryOrderLinks field (LDR_DATA_TABLE_ENTRY +0x08) rather than the
+ * entry's own base, which is why DllBase (real offset +0x18) reads back at
+ * cur+0x10 and BaseDllName.Length/Buffer (real offsets +0x2C/+0x30) at
+ * cur+0x24/+0x28 below.  Returns the module base, or 0 if the (circular)
+ * list runs out first. */
 int
 __ntdll_find_module (char const *want)
 {
@@ -164,11 +162,8 @@ __ntdll_find_module (char const *want)
 }
 
 /* Resolve one export by name out of a PE32 image already mapped at `base' in
- * this process -- the native-bitness counterpart of wow64resolve.c's
- * __wow64_resolve_export.  IMAGE_NT_HEADERS32's export data directory is at
- * +0x78 (+0x88 in the PE32+ header __wow64_resolve_export uses, the
- * difference being the width of the two headers' pointer-sized fields); the
- * export directory's four arrays (NumberOfNames +24, AddressOfFunctions
+ * this process.  IMAGE_NT_HEADERS32's export data directory is at +0x78;
+ * the export directory's four arrays (NumberOfNames +24, AddressOfFunctions
  * +28, AddressOfNames +32, AddressOfNameOrdinals +36) are the same ordinary
  * 32-bit-RVA fields regardless of image bitness.  Returns 0 if `name' is not
  * among the exports. */
