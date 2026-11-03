@@ -65,13 +65,12 @@
 ;; fork, exec in the child, wait in the parent, with the child putting the
 ;; current ports on 1 and 2 first so a redirected mes redirects what it runs.
 ;;
-;; Windows has no fork -- see lib/windows/fork.c for how far it can be pushed
-;; and what that costs -- and its primitive-fork answers -1 rather than
-;; pretending.  So -1 is not an error here but the other case: spawn is the
-;; one call such a system has, and it starts the program and waits in one
-;; step.  It takes this process's own environment, the way execv does and
-;; for the same reason, and the child inherits this process's handles, which
-;; is where the two dup2 calls above went.
+;; Windows has no fork, and its primitive-fork answers -1 (lib/stub/fork.c).
+;; So -1 is not an error here but the other case: spawn is the one call
+;; such a system has, and it starts the program and waits in one step.  It
+;; takes this process's own environment, the way execv does and for the
+;; same reason, and the child inherits this process's handles, which is
+;; where the two dup2 calls above went.
 (define (system* file-name . args)
   (let ((pid (primitive-fork)))
     (cond ((zero? pid)

@@ -115,8 +115,8 @@ main (int argc, char **argv)
   a = __ntdll (NT_WOW64READVM); b = __ntdll_resolve ("NtWow64ReadVirtualMemory64");
   if (a != b) { eputs ("MISMATCH NtWow64ReadVirtualMemory64\n"); ok = 0; }
 
-  /* NT_CLONE (RtlCloneUserProcess) is deliberately skipped above: it is 0 on
-   * Wine (see fork.c's own comment) and this VM's outcome for it is not the
+  /* NT_CLONE (RtlCloneUserProcess) is deliberately skipped above: Wine's
+   * ntdll has no such export, and this VM's outcome for it is not the
    * point being checked here.  A genuinely made-up name is checked instead,
    * to confirm a miss returns 0 rather than the last thing found. */
   b = __ntdll_resolve ("NtThisExportDoesNotExist");

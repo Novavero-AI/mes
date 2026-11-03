@@ -448,9 +448,8 @@ execle_ (struct scm *file_name, struct scm *args, struct scm *env)
  *
  * mes/module/mes/posix.mes builds system* out of primitive-fork, execlp and
  * waitpid, which is how a shell has always done it and how it still does it
- * wherever fork works.  Windows has no fork worth the name -- see
- * lib/windows/fork.c for how far it can be pushed and what it costs -- so
- * system* falls back to this when primitive-fork answers -1.
+ * wherever fork works.  Windows has no fork, so system* falls back to this
+ * when primitive-fork answers -1.
  *
  * The marshalling is execle_'s, and it is repeated rather than shared because
  * the two differ in the one line that matters and MesCC has no way to share

@@ -26,11 +26,11 @@
 /* Start a program, wait for it, and answer with what it exited with.
  *
  * The counterpart of lib/posix/spawn.c, which does this with fork, execve and
- * waitpid.  There is no fork here: Windows has RtlCloneUserProcess, and
- * lib/windows/fork.c does get a child out of it, but only on a real Windows
- * kernel and only by way of a 64-bit trampoline -- it is the most elaborate
- * thing in this directory and it is not what starting a program should
- * require.
+ * waitpid.  There is no fork here, and lib/stub/fork.c answers -1:
+ * RtlCloneUserProcess is missing from Wine, and under WOW64 the child it
+ * makes of a 32-bit process runs only after a 64-bit trampoline and a write
+ * into the child's copy of ntdll, which is not what starting a program
+ * should require.
  *
  * __spawn, which execve already stands on, starts the program directly; this
  * is execve without the _exit at the end, because a caller that wants to go
