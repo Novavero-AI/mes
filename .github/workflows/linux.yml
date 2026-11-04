@@ -1,0 +1,50 @@
+name: Linux
+
+on:
+  push:
+    branches: [windows-pe32-ntcall]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # stage0-posix Release_1.9.1, the release nixpkgs' minimal-bootstrap builds
+  # GNU Mes 0.27.1's mes-m2 with.
+  STAGE0_POSIX: 45d90f5955b6907dc6cdea9ebafce558359edcd3
+
+jobs:
+  mes-m2:
+    # kaem.run builds mes-m2 for x86 by default, the CPU the Windows port
+    # targets. The runner's x86_64 kernel runs its i386 programs.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/checkout@v7
+        with:
+          repository: oriansj/stage0-posix
+          ref: ${{ env.STAGE0_POSIX }}
+          path: stage0-posix
+          submodules: recursive
+
+      # From the hex0 seed to M2-Planet, mescc-tools and mescc-tools-extra in
+      # stage0-posix/x86/bin, checked against the release's x86.answers.
+      - name: Build the stage0-posix chain
+        working-directory: stage0-posix
+        run: ./bootstrap-seeds/POSIX/x86/kaem-optional-seed
+
+      # What configure.sh writes for Mes's own C library.
+      - name: Write include/mes/config.h
+        run: |
+          version=$(sed -n 's/^VERSION=//p' configure.sh)
+          printf '#undef SYSTEM_LIBC\n#define MES_VERSION "%s"\n' "$version" > include/mes/config.h
+
+      # PATH holds the chain's tools and nothing else, so nothing outside it
+      # takes part in the build. kaem.run runs mes-m2 once it is linked, so
+      # this fails if mes-m2 does not boot.
+      - name: Build mes-m2 with kaem.run
+        run: |
+          bin="$GITHUB_WORKSPACE/stage0-posix/x86/bin"
+          PATH="$bin" "$bin/kaem" --verbose --strict --file kaem.run
