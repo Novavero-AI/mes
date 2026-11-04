@@ -26,6 +26,12 @@
 
 char *__brk = 0;
 
+#if __M2__
+/* M2-Planet has no max_align_t.  Its widest type is long, which holds a
+   pointer on every target it compiles for. */
+#define M2_MALLOC_ALIGN sizeof (long)
+#endif
+
 /* A word, right before every pointer this returns, holding how many bytes
  * that allocation actually asked for. Nothing here ever frees -- brk only
  * moves forward -- so this never has to survive a reused block the way a
@@ -48,8 +54,15 @@ malloc (size_t size)
 
   if (!__brk)
     __brk = cast_long_to_charp (brk (0));
-#if !__M2__
-  /* align what we give back. */
+  /* Start the header on an alignment boundary, so what this gives back,
+     a long past it, is aligned to a long.  On Windows a misaligned buffer
+     is an error rather than a slowdown: the kernel fails a file call whose
+     object name's UTF-16 text is at an odd address with
+     STATUS_DATATYPE_MISALIGNMENT. */
+#if __M2__
+  __brk = cast_long_to_charp ((cast_charp_to_long (__brk)
+                               + M2_MALLOC_ALIGN - 1) & -M2_MALLOC_ALIGN);
+#else
   __brk = (char*) (((uintptr_t) __brk
                     + sizeof (max_align_t) - 1) & -sizeof (max_align_t));
 #endif
