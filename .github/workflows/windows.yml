@@ -110,3 +110,26 @@ jobs:
           $out
           if ($code -ne 0) { throw "scaffold/spawn.scm exited $code" }
           if ($out -notcontains 'spawned') { throw "the child's line is missing from the output" }
+
+      # nova-nix reads a file's execute bit from its nova.exec stream, by the
+      # Win32 name FILE:nova.exec. The one-letter names also check that the
+      # stream is named on the NT path: Win32 reads x:nova.exec as nova.exec
+      # on drive X.
+      - name: chmod and open mark the execute bit
+        shell: pwsh
+        run: |
+          function exec-bit { ./bin/mes-m2.exe scaffold/exec-bit.scm @args; if ($LASTEXITCODE -ne 0) { throw "scaffold/exec-bit.scm $args exited $LASTEXITCODE" } }
+          function marked($file) {
+            $stream = "$((Resolve-Path -LiteralPath $file).Path):nova.exec"
+            if (-not [IO.File]::Exists($stream)) { return $false }
+            if ([IO.File]::ReadAllText($stream) -ne '1') { throw "$stream does not hold 1" }
+            $true
+          }
+          exec-bit open x 755
+          if (-not (marked x)) { throw 'open with mode 0755 left x unmarked' }
+          exec-bit open y 644
+          if (marked y) { throw 'open with mode 0644 marked y' }
+          exec-bit chmod y 755
+          if (-not (marked y)) { throw 'chmod 0755 left y unmarked' }
+          exec-bit chmod y 644
+          if (marked y) { throw 'chmod 0644 left y marked' }
