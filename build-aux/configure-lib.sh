@@ -208,6 +208,7 @@ lib/stub/dup.c
 lib/stub/execve.c
 lib/stub/fcntl.c
 lib/stub/fork.c
+lib/posix/spawn.c
 lib/stub/fstat.c
 lib/stub/_getcwd.c
 lib/stub/gettimeofday.c

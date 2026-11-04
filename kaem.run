@@ -110,6 +110,7 @@ M2-Planet                                               \
     -f ${srcdest}include/sys/resource.h                 \
     -f ${srcdest}lib/linux/wait4.c                      \
     -f ${srcdest}lib/linux/waitpid.c                    \
+    -f ${srcdest}lib/posix/spawn.c                      \
     -f ${srcdest}lib/linux/gettimeofday.c               \
     -f ${srcdest}lib/linux/clock_gettime.c              \
     -f ${srcdest}lib/m2/time.c                          \
