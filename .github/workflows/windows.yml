@@ -10,7 +10,7 @@ permissions:
 
 env:
   # The stage0-pe32 commit nova-nix builds its Windows stage0 from.
-  STAGE0_PE32: 28ec2d263dc144b674250c9939f2df66d2f67120
+  STAGE0_PE32: ff1c2ad86a91d3d7d086722ffed49dfe18dd50d0
 
 jobs:
   mes-m2:
