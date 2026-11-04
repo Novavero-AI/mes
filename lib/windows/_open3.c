@@ -25,18 +25,26 @@
 /* Stands in for lib/linux/_open3.c.
  *
  * The POSIX flags are turned into the DesiredAccess and CreateDisposition
- * NtCreateFile wants.  Windows has no permission bits of the shape mask
- * carries, so mask is accepted and ignored -- see lib/windows/chmod.c, which
- * is the same answer at more length.
+ * NtCreateFile wants.  Of mask, only the owner execute bit counts, and only
+ * for a file the open creates, as on Linux: __exec_create, in
+ * lib/windows/chmod.c, marks such a file the way chmod does.  This C library
+ * keeps no umask on Windows (lib/stub/umask.c), so mask is used as given.  If
+ * a file it creates cannot be marked, the open closes it and fails, and the
+ * file stays.
  *
  * The bookkeeping after the open is Mes's own and is the same as the Linux
  * one: a fresh descriptor has no pushed-back character and nothing buffered.
  */
 
+/* The Information NtCreateFile leaves in the IO_STATUS_BLOCK when it made
+   the file. */
+#define FILE_CREATED 2
+
 int
 _open3 (char const *file_name, int flags, int mask)
 {
   int NtCreateFile;
+  int NtClose;
   int *oa;
   int *iosb;
   int *handle;
@@ -76,6 +84,14 @@ _open3 (char const *file_name, int flags, int mask)
     return -1;
 
   r = handle[0];
+  if (iosb[1] == FILE_CREATED)
+    if (__exec_create (oa, mask) != 0)
+      {
+        NtClose = __ntdll_resolve ("NtClose");
+        __ntcall1 (NtClose, r);
+        return -1;
+      }
+
   __ungetc_init ();
   if (r > 2)
     {

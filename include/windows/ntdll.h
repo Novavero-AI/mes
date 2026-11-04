@@ -79,5 +79,6 @@ int *__dosustring (char const *path);
 int *__ntobject (char const *path);
 int __strput (char *dst, int at, char const *src);
 int __spawn (char const *file_name, char **argv, char **env);
+int __exec_create (int *file, int mode);
 
 #endif /* __MES_WINDOWS_NTDLL_H */
