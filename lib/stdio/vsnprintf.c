@@ -23,6 +23,12 @@
 #include <stdarg.h>
 #include <string.h>
 
+/* A compiler's own stdarg.h defines va_arg alone, and its va_arg reads a
+   double as one.  */
+#ifndef va_arg8
+#define va_arg8(ap, type) va_arg (ap, type)
+#endif
+
 int
 vsnprintf (char *str, size_t size, char const *format, va_list ap)
 {
