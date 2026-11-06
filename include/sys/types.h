@@ -165,7 +165,13 @@ typedef unsigned uid_t;
 #ifndef __MES_WCHAR_T
 #define __MES_WCHAR_T
 #undef wchar_t
+// The compiler names the type of a wide character literal for its
+// target; MesCC names none.
+#ifdef __WCHAR_TYPE__
+typedef __WCHAR_TYPE__ wchar_t;
+#else
 typedef int wchar_t;
+#endif
 #endif
 #endif
 
