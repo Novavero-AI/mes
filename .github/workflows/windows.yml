@@ -2,7 +2,7 @@ name: Windows
 
 on:
   push:
-    branches: [windows-pe32-ntcall]
+    branches: [master]
   pull_request:
 
 permissions:
