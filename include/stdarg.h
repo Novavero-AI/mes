@@ -3,6 +3,7 @@
  * Copyright © 2017,2018,2019 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
  * Copyright © 2021 W. J. van der Laan <laanwj@protonmail.com>
  * Copyright © 2023 Andrius Štikonas <andrius@stikonas.eu>
+ * Copyright © 2026 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -28,7 +29,8 @@
 
 #define va_arg8(ap, type) va_arg (ap, type)
 
-#elif (__GNUC__ || __TINYC__) && __riscv
+#else // ! SYSTEM_LIBC
+#if (__GNUC__ || __TINYC__) && __riscv
 
 // GCC on RISC-V always passes arguments in registers.  Implementing
 // these macros without the use of built-ins would be very involved.
@@ -65,7 +67,7 @@ typedef __builtin_va_list va_list;
 #define va_arg8(ap, type)  va_arg (ap, type)
 #define va_copy(d, s)      __builtin_va_copy (d, s)
 
-#else // ! SYSTEM_LIBC && ! __riscv
+#else // ! __riscv
 
 #include <sys/types.h>
 
@@ -81,14 +83,9 @@ typedef char *va_list;
 #define va_end(ap) (void)((ap) = 0)
 #define va_copy(dest, src) dest = src
 
+#endif // !__riscv
+
 int vexec (char const *file_name, va_list ap);
-int vfprintf (FILE * stream, char const *template, va_list ap);
-int vfscanf (FILE * stream, char const *template, va_list ap);
-int vprintf (char const *format, va_list ap);
-int vsprintf (char *str, char const *format, va_list ap);
-int vsnprintf (char *str, size_t size, char const *format, va_list ap);
-int vsscanf (char const *s, char const *template, va_list ap);
 
 #endif // ! SYSTEM_LIBC
-
 #endif // __MES_STDARG_H

@@ -1,7 +1,7 @@
 ;;; -*-scheme-*-
 
 ;;; GNU Mes --- Maxwell Equations of Software
-;;; Copyright © 2021, 2024 Janneke Nieuwenhuizen <janneke@gnu.org>
+;;; Copyright © 2021,2024,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
 ;;; Copyright © 2022,2023 Timothy Sample <samplet@ngyro.com>
 ;;;
 ;;; This file is part of GNU Mes.
@@ -61,6 +61,7 @@
             concatenate
             reduce
             drop
+            drop-right
             drop-while
             partition
             span
@@ -84,6 +85,9 @@
       (fold f (car lst) (cdr lst))))
 
 (define drop list-tail)
+
+(define (drop-right lst n)
+  (list-head lst (- (length lst) n)))
 
 (define (drop-while pred lst)
   (let loop ((lst lst))

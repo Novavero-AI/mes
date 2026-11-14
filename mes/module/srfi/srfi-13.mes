@@ -1,8 +1,9 @@
 ;;; -*-scheme-*-
 
 ;;; GNU Mes --- Maxwell Equations of Software
-;;; Copyright © 2016,2017,2018,2024 Janneke Nieuwenhuizen <janneke@gnu.org>
+;;; Copyright © 2016,2017,2018,2024,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
 ;;; Copyright © 2022,2023 Timothy Sample <samplet@ngyro.com>
+;;; Copyright © 2025 Ekaitz Zarraga <ekaitz@elenq.tech>
 ;;;
 ;;; This file is part of GNU Mes.
 ;;;
@@ -39,8 +40,13 @@
          ((prefix) (string-append delimiter (car lst) (apply string-join (cdr lst) delimiter+grammar)))
          ((suffix) (string-append (car lst) delimiter (apply string-join (cdr lst) delimiter+grammar)))))))
 
-(define (string-copy s)
-  (list->string (string->list s)))
+(define (string-copy s . rest)
+  (let* ((start (if (pair? rest) (car rest) 0))
+         (rest  (if (pair? rest) (cdr rest) '()))
+         (end   (if (pair? rest) (car rest) (string-length s)))
+         (res   (make-string (- end start))))
+    (string-copy! res 0 s start end)
+    res))
 
 (define (string= a b . rest)
   (if (null? rest)
@@ -108,20 +114,17 @@
 
 (define (string-take s n)
   (cond ((zero? n) s)
-        ((> n 0) (list->string (list-head (string->list s) n)))
+        ((> n 0) (string-copy s 0 n))
         (else (error "string-take: not supported: n=" n))))
 
 (define (string-drop s n)
   (cond ((zero? n) s)
-        ((> n 0) (list->string (list-tail (string->list s) n)))
+        ((>= n 0) (string-copy s n))
         (else s (error "string-drop: not supported: (n s)=" (cons n s)))))
-
-(define (drop-right lst n)
-  (list-head lst (- (length lst) n)))
 
 (define (string-drop-right s n)
   (cond ((zero? n) s)
-        ((> n 0) ((compose list->string (lambda (o) (drop-right o n)) string->list) s))
+        ((> n 0) (string-copy s 0 (- (string-length s) n)))
         (else (error "string-drop-right: not supported: n=" n))))
 
 (define (string-delete char-pred s)
@@ -292,7 +295,8 @@
      (else s))))
 
 (define (string-every chr str)
-  (let loop ((k 0))
-    (or (>= k (string-length str)) #t
-        (and (char=? (string-ref str k) chr)
-             (loop (1+ k))))))
+  (let ((l (string-length str)))
+    (let loop ((k 0))
+      (or (>= k l)
+          (and (char=? (string-ref str k) chr)
+               (loop (1+ k)))))))

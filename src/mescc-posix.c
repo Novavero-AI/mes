@@ -86,7 +86,7 @@ environ_ (struct scm *args)
   else
     {
       error (cell_symbol_wrong_number_of_args,
-             cons (args, cstring_to_symbol ("environ")));
+             cons (make_number (length__ (args)), cstring_to_symbol ("environ")));
     }
 }
 
@@ -174,6 +174,7 @@ close_port (struct scm *port)
   if (port->type == TNUMBER)
     if (close (port->value) != 0)
       error (cell_symbol_system_error, cons (make_string0 ("Error closing port"), port));
+  return cell_unspecified;
 }
 
 struct scm *
@@ -251,7 +252,7 @@ stat__ (char const *variant, struct scm *args)
 
   if (args->type != TPAIR)
     error (cell_symbol_wrong_number_of_args,
-           cstring_to_symbol (variant));
+           cons (make_number (length__ (args)), cstring_to_symbol (variant)));
 
   file_name = args->car;
 
@@ -263,8 +264,8 @@ stat__ (char const *variant, struct scm *args)
     {
       exception_on_error = args->cdr->car;
       if (args->cdr->cdr != cell_nil)
-        error (cell_symbol_wrong_number_of_args,
-               cstring_to_symbol (variant));
+      error (cell_symbol_wrong_number_of_args,
+             cons (make_number (length__ (args)), cstring_to_symbol (variant)));
     }
 
   /* It's a little sneaky.... */
@@ -398,7 +399,7 @@ umask_ (struct scm *args)
                cons (args->car, cstring_to_symbol ("umask")));
       if (args->cdr != cell_nil)
         error (cell_symbol_wrong_number_of_args,
-               cstring_to_symbol ("umask"));
+               cons (make_number (length__ (args)), cstring_to_symbol ("umask")));
       return make_number (umask (args->car->value));
     }
   else

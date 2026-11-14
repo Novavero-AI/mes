@@ -1,6 +1,6 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
- * Copyright © 2018 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2018, 2025 Janneke Nieuwenhuizen <janneke@gnu.org>
  *
  * This file is part of GNU Mes.
  *
@@ -20,12 +20,8 @@
 
 int g_time = 1;
 
-#if __TINYC__
-#define time time_
-#endif
-
 int *
-time ()
+time_ ()
 {
   return &g_time;
 }
@@ -33,5 +29,5 @@ time ()
 int
 main ()
 {
-  return *time () - 1;
+  return *time_ () - 1;
 }

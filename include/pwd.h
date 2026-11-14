@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2018 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Stefan <stefan-guix@vodafonemail.de>
  *
  * This file is part of GNU Mes.
  *
@@ -38,6 +39,7 @@ struct passwd
   char *pw_shell;
 };
 
+struct passwd *getpwnam (const char *name);
 struct passwd *getpwuid ();
 
 

@@ -2,6 +2,7 @@
 
 # GNU Mes --- Maxwell Equations of Software
 # Copyright © 2018,2019,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2025 Stefan <stefan-guix@vodafonemail.de>
 #
 # This file is part of GNU Mes.
 #
@@ -55,13 +56,18 @@ then
     MES_CHECKING_BUILTIN_LIBS="`${CC} --print-libgcc-file-name`"
 fi
 
-if [ -z "${i/[012][0-9]-*/}" ]; then
+# We use a POSIX compatible trick to get the first character from a
+# variable: Drop from it the suffix, which is the varible content with
+# its first character removed.  Finally compare this first character to
+# the group-of-ten.
+
+if (echo $i | grep -Eq '^[012]'); then
     LIBS="${MES_CHECKING_BUILTIN_LIBS} -l c-mini"
-elif [ -z "${i/[34][0-9]-*/}" ]; then
+elif (echo $i | grep -Eq '^[34]'); then
     LIBS="-l c-mini ${MES_CHECKING_BUILTIN_LIBS} -l c-mini"
-elif [ -z "${i/[78][0-9a-z]-*/}" ]; then
+elif (echo $i | grep -Eq '^[78]'); then
     LIBS="-l c+tcc ${MES_CHECKING_BUILTIN_LIBS} -l c+tcc"
-elif [ -z "${i/9[0-9a-z]-*/}" ]; then
+elif (echo $i | grep -Eq '^[9a]'); then
     LIBS="-l c+gnu ${MES_CHECKING_BUILTIN_LIBS} -l c+gnu"
 else
     # Make it possible to resolve raise(), required by libgcc.a, provided
@@ -86,7 +92,7 @@ $CC -g -c $AM_CPPFLAGS $CPPFLAGS $AM_CFLAGS $CFLAGS -o "$o".o "$t"
 $CC -g $AM_CFLAGS $CFLAGS $AM_LDFLAGS $LDFLAGS -L . -o "$o" $crt1 "$o".o $LIBS
 
 set +e
-timeout 20 "$o" -s --long file0 file1 > "$o".1 2> "$o".2
+"$o" -s --long file0 file1 > "$o".1 2> "$o".2
 r=$?
 set -e
 if [ -f "$b".exit ]; then
@@ -101,8 +107,8 @@ if [ $r != $e ]; then
     exit 1
 fi
 if [ -f "$b".stdout ]; then
-    $DIFF -ub "$b".stdout "$o".1
+    $DIFF -u "$b".stdout "$o".1
 fi
 if [ -f "$b".stderr ]; then
-    $DIFF -ub "$b".stderr "$o".2
+    $DIFF -u "$b".stderr "$o".2
 fi

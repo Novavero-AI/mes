@@ -13,7 +13,7 @@
 @set OPENPGP-SIGNING-KEY-ID 1A858392E331EAFDB8C27FFBF3C1A0D9C1D65273
 
 @copying
-Copyright @copyright{} 2018,2019,2020,2021,2022,2023,2024 Janneke Nieuwenhuizen@*
+Copyright @copyright{} 2018-2024,2026 Janneke Nieuwenhuizen@*
 Copyright @copyright{} 2025 Ekaitz Zarraga@*
 
 Permission is granted to copy, distribute and/or modify this document
@@ -59,6 +59,7 @@ Scheme interpreter and C compiler written for bootstrapping the GNU system.
 * Introduction::                What is Mes about?
 * Installation::                Installing Mes.
 * Bootstrapping::               Would you strap my boots?
+* Mes internals::               How Mes works.
 * Contributing::                Your help needed!
 * Acknowledgments::             Thanks!
 * Resources::
@@ -107,6 +108,13 @@ Invoking mes
 Invoking mescc
 
 * MesCC Environment Variables::  There's no NIX like POSIX.
+
+Mes internals
+
+* Overview::                    Overview of the Scheme interpreter.
+* Compilation::                 Compiling to bytecode.
+* Bytecode Interpreter::        Interpreting bytecode.
+* Boot Process::                How the Scheme interpreter is started.
 
 Contributing
 
@@ -572,7 +580,7 @@ GNU Mes depends on the following packages:
 later, including 2.2.x and 3.0.x,
 @item @url{https://www.gnu.org/software/make/, GNU Make}.
 @item @url{https://savannah.gnu.org/projects/nyacc/, NYACC}, version 1.00.2 or later;
-2.02.2 is known to work,
+3.00.0 is known to work,
 @item @url{https://gcc.gnu.org, GCC's gcc}, version 2.95.3 or later, including 14.3.0,
 @item @url{https://savannah.gnu.org/projects/mescc-tools/, mescc-tools}, version 1.5.0 or later;
 1.7.0 is known to work,
@@ -582,8 +590,8 @@ The following dependencies are optional:
 
 @itemize
 Support for building the bootstrap @file{bin/mes-m2} depends on
-@item @url{https://github.com/oriansj/m2-planet/, M2-Planet}, version 1.11.0 or later;
-1.12.0 is known to work.
+@item @url{https://github.com/oriansj/m2-planet/, M2-Planet}, version 1.13.1 or later;
+1.13.1 is known to work.
 @end itemize
 
 @cindex Guile, compatibility
@@ -613,7 +621,8 @@ Bootstrapping Mes depends on the following packages:
 @itemize
 @item a POSIX-compatible shell
 @item @url{https://savannah.gnu.org/projects/mescc-tools/, mescc-tools}, version 1.5.0,
-@item @url{https://github.com/oriansj/m2-planet/, M2-Planet}, version 1.11.0.
+@item @url{https://github.com/oriansj/m2-planet/, M2-Planet}, version 1.12.1 or later;
+1.13.0 is known to work.
 @item @url{https://savannah.gnu.org/projects/nyacc/, NYACC}, version 1.00.2 or later;
 1.09.4 is known to work.
 @end itemize
@@ -638,7 +647,7 @@ build-aux/check-boot.sh
 Run a single Mes boot test
 
 @example
-MES_BOOT=scaffold/boot/00-zero.scm bin/mes
+MES_BOOT=boot.scm bin/mes < scaffold/boot/00-zero.scm
 @end example
 
 Run a single Mes Scheme test
@@ -921,12 +930,7 @@ Set @env{MES_BOOT} to change the initial Scheme program that mes runs.
 @item MES_ARENA
 @vindex MES_ARENA
 
-The initial size of the arena @pxref{5.3,,, sicp, SICP} in cells.  Default: 20,000.
-
-@item MES_MAX_ARENA
-@vindex MES_MAX_ARENA
-
-The maximum size of the arena in cells.  Default: 100,000,000.
+The size of the arena @pxref{5.3,,, sicp, SICP} in cells.  Default: 20,000.
 
 @item MES_MAX_STRING
 @vindex MES_MAX_STRING
@@ -1120,6 +1124,275 @@ display version and exit
 @end table
 
 @c *********************************************************************
+@node Mes internals
+@chapter Mes internals
+
+@menu
+* Overview::                    Overview of the Scheme interpreter.
+* Compilation::                 Compiling to bytecode.
+* Bytecode Interpreter::        Interpreting bytecode.
+* Boot Process::                How the Scheme interpreter is started.
+
+@end menu
+
+@node Overview
+@section Overview
+
+@cindex interpreter
+Mes is a very simple Scheme interpreter.
+
+Prior to version 0.28.0 it was a tree-walking interpreter but it was
+rewritten as a bytecode interpreter for the 0.28.0 release.
+
+Being a bytecode interpreter separates the stages of the interpreter
+more clearly.  This gives us the chance to introduce small optimizations
+and also make sure our code is as tight as possible in memory, which
+results in better performance.  @footnote{In the first iteration to the
+bytecode interpreter performance was improved by a 40%.}
+
+The interpreter takes top-level expressions one by one, macro expands
+them, compiles them and runs them.  This means compilation time is
+interleaved with evaluation time.
+
+@node Compilation
+@section Compilation
+
+The compilation unit of Mes is the procedure.  Each procedure is
+compiled to a @dfn{template}, a data structure that holds the code
+(bytecode) of the procedure, its literals, and some extra metadata.
+There's no global literal pool: all literals are stored in the
+template of the procedure they appear in.
+
+Top-level expressions are wrapped in procedures and compiled to
+templates, too.  Procedures that contain procedures compile the inner
+procedures to templates and treat them as literals of the outer
+procedure.
+
+Templates are wrapped in closures, and are not accessible to the user
+directly.  A @dfn{closure} is a template in a particular environment.
+That is, it contains both the template and the variables it captured
+from the environment where it was instantiated.  If two closures come
+from the same function definition, the code is shared: they use the same
+template.
+
+If you want to see the bytecode of a closure, you can use the
+@code{procedure-disassemble} procedure.
+
+@deffn {Procedure} procedure-disassemble proc
+
+Display the disassembly of the given procedure.  Returns
+@code{*unspecified*}.
+
+@itemize
+@item
+@var{proc}: Procedure to disassemble.
+@end itemize
+@end deffn
+
+The following example shows a few interesting features.
+
+@example
+@verbatim
+mes@(guile-user)> (procedure-disassemble (lambda (a) (+ 1 a)))
+[sexp=(procedure-disassemble (lambda (a) (+ 1 a)))]
+  ────────────────────────── 0x7f1ad4d04798
+  - name: anonymous#2585
+  - arity: 1
+  - source: (core:lambda (a) (+ 1 a))
+       0:	0x04          OP_LITERAL
+       1:	0xaa                   0 1
+       2:	0x00                   .
+       3:	0x00                   .
+       4:	0x09        OP_REF_LOCAL
+       5:	0xaa                   0 a
+       6:	0x00                   .
+       7:	0x00                   .
+       8:	0x0b          OP_RESOLVE
+       9:	0x04          OP_LITERAL
+      10:	0x01                   1 #<binding +: #<variable #<builtin +>>>
+      11:	0x00                   .
+      12:	0x0b          OP_RESOLVE
+      13:	0x10        OP_TAIL_CALL
+      14:	0x02                   2 2
+      15:	0x00                   .
+      16:	0x11           OP_RETURN
+@end verbatim
+@end example
+
+First, one can see how the @code{+} symbol is already bound to a builtin
+showing that all global variables in the code are resolved at compile
+time.  Similarly, the symbol @code{a} is recognized as a local variable
+and reduced to an index (0 in this case) for faster lookups.
+
+Second, what the template stores as the @code{source} is not the original
+code, but the macro expanded version, which is reduced to a simplified
+Scheme, not the one that one would write manually.  That separation
+between human-written Scheme and the compiler input makes the code easier
+to process by the compiler.
+
+This is the list of special syntax the compiler accepts:
+
+@itemize
+@item @code{(core:gc)}
+@item @code{(core:set-mark! mark)}
+@item @code{(core:ref-mark)}
+@item @code{(core:apply proc args)}
+@item @code{(core:begin exp ...)}
+@item @code{(core:call/cc handler)}
+@item @code{(core:define name value)}
+@item @code{(core:if condition true-case false-case)}
+@item @code{(core:lambda formals body ...)}
+@item @code{(core:quote exp)}
+@item @code{(core:set! binding|name value)}
+@end itemize
+
+This simplified Scheme is compiled down to a representation that matches
+its meaning but is bytecode for a stack-based virtual machine.
+
+@node Bytecode Interpreter
+@section Bytecode Interpreter
+
+In Mes, all values are heap allocated, but they are arranged in a stack.
+Local variables, procedure arguments, temporary values@enddots{}
+Everything is put on the stack.
+
+The function @code{eval_compiled} in the file @file{src/eval-apply.c}
+evaluates the code in the virtual machine.  It is a big loop that has
+minimal internal state, mostly the @abbr{pc, program counter}, the
+@abbr{fp, frame pointer}, the current procedure, and the current mark.
+The loop increases the program counter, reads the current instruction,
+evaluates it, and repeats.
+
+When a procedure is called, it is set as the @emph{current procedure},
+the @abbr{pc, program counter} is set to 0 and the loop continues, this
+time over the code of the new @emph{current procedure}.
+
+In order to be able to return to the caller, a @emph{frame} is pushed to
+the stack.  This records the @abbr{pc, program counter} of the caller
+procedure and the @abbr{fp, frame pointer}, which is the (stack-) index
+of the caller frame.  With that, all the frames are connected to one
+another by the @abbr{fp, frame pointer}.
+
+When returning from a procedure, the @emph{frame} is read from the
+@emph{fp} index on the stack. That is used to reset the virtual-machine
+state to the one it had prior to the call, and the program continues its
+execution from there, with the return value of the just resolved call on
+the top of the stack.
+
+As required by Scheme, the virtual machine also supports tail call
+elimination.  The compiler recognizes when a procedure is called in tail
+position, and emits special instructions to avoid pushing the current
+procedure's frame onto the stack before making the new call.
+
+This is the full list of operations the virtual machine supports.  All
+arguments are 16-bit unsigned values, and they are aligned in memory by
+adding an empty byte between the instruction and the argument when
+needed.
+
+@table @code
+
+@item OP_UNSPECIFIED
+Push @code{*unspecified*} to the stack.
+
+@item OP_NIL
+Push @code{()} to the stack.
+
+@item OP_FALSE
+Push @code{#f} to the stack.
+
+@item OP_TRUE
+Push @code{#t} to the stack.
+
+@item OP_LITERAL, @var{ID}
+Push the literal named @var{ID} to the stack.
+
+@item OP_DROP
+Drop the top of the stack.
+
+@item OP_BRANCH, @var{TARGET}
+Pop the top of the stack, if @code{#f} set the program counter to
+@var{TARGET}.
+
+@item OP_JUMP, @var{TARGET}
+Set the program counter to @code{TARGET}.
+
+@item OP_SET
+Pop a location and a value from the stack and set the location to the
+value.  Push @code{*unspecified*}.
+
+@item OP_REF_LOCAL, @var{ID}
+Push the local named @var{ID} to the stack.
+
+@item OP_REF_CLOSURE, @var{ID}
+Push the capture named @var{ID} to the stack.
+
+@item OP_RESOLVE
+Replace a global binding on the top of the stack with its current value.
+
+@item OP_CLOSURE, @var{ARGNO}
+Pop @var{ARGNO} values from the stack followed by a template and push a
+closure formed with them back to the stack.
+
+@item OP_CC, @var{TARGET}
+Push a continuation to the stack that restores virtual machine state to
+the current one but with the program counter set to @var{TARGET}.
+
+@item OP_CALL, @var{ARGNO}
+Pop a procedure (a closure, a builtin, or a continuation) and
+@var{ARGNO} arguments from the stack and perform a procedure call.
+
+@item OP_TAIL_CALL, @var{ARGNO}
+Same as @code{OP_CALL} but performing a tail call.
+
+@item OP_RETURN
+Pop a value from the stack and replace the current frame by it
+effectively returning to the caller procedure.  If there's no caller
+procedure, stop evaluation and return the value.
+
+@item OP_APPLY
+Pop an argument list and a procedure to call from the stack, and then
+call the procedure with those arguments.
+
+@item OP_TAIL_APPLY
+Same as @code{OP_APPLY} but performing a tail call.
+
+@item OP_REF_MARK
+Push the current mark to the stack.
+
+@item OP_SET_MARK
+Pop a value from the stack and set the current mark to it.
+
+@item OP_GC
+Perform garbage collection.
+
+@item OP_UNREACHABLE
+This is the default value of each byte and corresponds to @code{0xAA}.
+Evaluating it produces an error.
+
+@end table
+
+@node Boot Process
+@section Boot Process
+
+When Mes is started it first sets everything up so the user program can
+be run.  This is what we call the @dfn{boot process}.  Mes starts
+without any macro expander; a very simple C loop drives program
+execution.  This loop reads expressions from the initial boot file one
+by one, compiling and executing them as it goes.
+
+@cindex expander, macro expander
+The initial boot file, @file{mes/module/mes/boot.scm}, defines a simple
+Lisp-style macro-expander @footnote{In the sense that it does nothing to
+help macro writers create hygienic macros.} written in Scheme.  Once
+ready, the macro expander takes control of the program: it reads
+expressions, expands them, compiles them, and then evaluates them.
+
+From there, the rest of the boot process proceeds.  This is where many
+basic procedures are defined and the module system is booted.  When this
+is finished, control is finally transferred either to a user program or
+the @abbr{REPL, read-eval-print loop}.
+
+@c *********************************************************************
 @node Contributing
 @chapter Contributing
 
@@ -1212,7 +1485,8 @@ important for Mes to be as fast as possible, while still being simple.
 make -f simple.make benchmark
 @end example
 
-Runs a simple benchmark for the Mes interpreter and dump the results in
+Runs a simple benchmark for the Mes interpreter and dumps the benchmark
+results in @code{benchmark/log}. Programs output is written to
 @code{benchmark/out}.  That should be enough for testing if your changes
 affected its performance.  Make sure to run them before and after your
 change, and saving the results, as the makefile will overwrite them.
@@ -1344,7 +1618,7 @@ It will be ready sooner if you help.
 @end quotation
 
 @cindex contact, irc, mailing list
-Join us on @code{#bootstrappable} on the Libera Chat IRC network or on
+Join us on @code{#mes} on the Libera Chat IRC network or on
 @email{bug-mes@@gnu.org} to share your experience---good or bad.
 
 @cindex bug, bug report, reporting a bug

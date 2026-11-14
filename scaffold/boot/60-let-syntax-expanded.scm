@@ -22,7 +22,7 @@
 (define (defined? x)
   ((lambda (v)
      (if v (if (eq? (variable-ref v) *undefined*) #f #t) #f))
-   (core:hashq-ref (initial-module) x #f)))
+   (module-variable (initial-module) x)))
 
 (define (cond-expand-expander clauses)
   (if (defined? (car (car clauses)))
@@ -67,7 +67,7 @@
       (cons (car rest) (core:apply cons* (cdr rest) (current-environment)))))
 
 (define (apply f h . t)
-  (if (null? t) (core:apply f h (current-environment))
+  (if (null? t) (core:apply f h)
       (apply f (apply cons* (cons h t)))))
 
 (define (append . rest)
@@ -148,10 +148,10 @@
 
 (define (cons* . rest)
   (if (null? (cdr rest)) (car rest)
-      (cons (car rest) (core:apply cons* (cdr rest) (current-environment)))))
+      (cons (car rest) (core:apply cons* (cdr rest)))))
 
 (define (apply f h . t)
-  (if (null? t) (core:apply f h (current-environment))
+  (if (null? t) (core:apply f h)
       (apply f (apply cons* (cons h t)))))
 
 (define (append . rest)

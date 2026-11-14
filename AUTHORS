@@ -15,6 +15,7 @@ Co-author of Guile-compatible variable lookup
 Co-author of Guile-compatible hash-table, record interface
 Co-author of Guile Module support
 Gash Support
+Scheme expander (mes/module/mes/boot.scm)
 Additions and fixes throughout
 
 Jeremiah Orians <jeremiah@pdp10.guru>
@@ -51,6 +52,7 @@ Make the x86_64 port emit position independent code.
 
 Ekaitz Zarraga <ekaitz@elenq.tech>
 Fixes for RISC-V port and bootstrap.
+The compiler and bytecode interpreter
 
 List of imported files
 

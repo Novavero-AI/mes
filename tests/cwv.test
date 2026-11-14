@@ -78,4 +78,10 @@ exec ${MES-bin/mes} --no-auto-compile -L ${0%/*} -L module -C module -e '(tests 
      (list five)))
   1 2 3 (values 'four-a 'four-b) 5))
 
+(pass-if-equal "apply values"
+               10
+               (call-with-values
+                 (lambda () (apply values (list 1 2 3 4)))
+                 (lambda x  (apply + x))))
+
 (result 'report)

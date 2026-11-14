@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
- * Copyright © 2016,2017,2018,2019 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2026 Ekaitz Zarraga <ekaitz@elenq.tech>
+ * Copyright © 2026 Janneke Nieuwenhuizen <janneke@gnu.org>
  *
  * This file is part of GNU Mes.
  *
@@ -18,25 +19,35 @@
  * along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __MES_CC_H
-#define __MES_CC_H
+#include <stdio.h>
+struct scm
+{
+  int type;
+  struct scm *car;
+  struct scm *cdr;
+};
 
-typedef struct scm* SCM;
+int
+main ()
+{
+  struct scm* cells = 0;
+  struct scm* free = cells + 1;
 
-#if __MESC__
-typedef long FUNCTION;
-typedef long function0_t;
-typedef long function1_t;
-typedef long function2_t;
-typedef long function3_t;
-typedef long functionn_t;
-#else // !__MESC__
-typedef SCM (*FUNCTION) (void);
-typedef SCM (*function0_t) (void);
-typedef SCM (*function1_t) (SCM);
-typedef SCM (*function2_t) (SCM, SCM);
-typedef SCM (*function3_t) (SCM, SCM, SCM);
-typedef SCM (*functionn_t) (SCM);
-#endif // !__MESC__
+  free  = cells + 1;
+  printf ("size of scm: %d\n", sizeof (struct scm));
+  if ((free - cells) != 1)
+    return 1;
 
-#endif //__MES_CC_H
+  long GC_SAFETY = 2;
+  long used = (free - cells) + GC_SAFETY;
+  printf ("used: %ld\n", used);
+  if (used != 3)
+    return 2;
+
+  unsigned char foo = (free - cells) - GC_SAFETY;
+  printf ("foo: %u\n", foo);
+  if (foo != 255)
+    return 3;
+
+  return 0;
+}

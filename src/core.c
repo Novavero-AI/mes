@@ -68,6 +68,18 @@ cdr (struct scm *x)
 }
 
 struct scm *
+list2 (struct scm *x, struct scm *y)
+{
+  return cons (y, cons (x, cell_nil));
+}
+
+struct scm *
+list3 (struct scm *x, struct scm *y, struct scm *z)
+{
+  return cons (x, list2 (y, z));
+}
+
+struct scm *
 list (struct scm *x)                    /*:((arity . n)) */
 {
   return x;
@@ -149,10 +161,14 @@ length (struct scm *x)
 struct scm *
 error (struct scm *key, struct scm *x)
 {
-  struct scm *throw = lookup_value (cell_symbol_throw);
-  if (throw != cell_undefined)
-    return apply (throw, cons (key, cons (x, cell_nil)), R0);
 
+#if (__riscv && (__GNUC__ || __TINYC__)) || (!__riscv && !__M2__)
+  /* M2 doesn't have setjmp/longjmp */
+  stack_push (cons (key, cons (x, cell_nil)));
+  longjmp (JMP_BUF, 1);
+#endif
+
+  /* Just die */
   display_error_ (key);
   eputs (": ");
   write_error_ (x);

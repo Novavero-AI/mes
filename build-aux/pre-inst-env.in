@@ -1,7 +1,7 @@
 #! @BASH@
 
 # GNU Mes --- Maxwell Equations of Software
-# Copyright © 2018,2019,2023 Janneke Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2018,2019,2023,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
 #
 # This file is part of GNU Mes.
 #
@@ -28,6 +28,10 @@ program_prefix=${program_prefix-@program_prefix@}
 
 MES_PREFIX=${MES_PREFIX-${abs_top_srcdir}}
 export MES_PREFIX
+
+GUILE_LOAD_PATH=${GUILE_LOAD_PATH-}
+GUILE_LOAD_COMPILED_PATH=${GUILE_LOAD_COMPILED_PATH-}
+GUIX_PACKAGE_PATH=${GUIX_PACKAGE_PATH-}
 
 GUILE_LOAD_COMPILED_PATH="$abs_top_builddir/scripts:$abs_top_builddir/module${GUILE_LOAD_COMPILED_PATH:+:}$GUILE_LOAD_COMPILED_PATH"
 GUILE_LOAD_PATH="$abs_top_srcdir/module:$abs_top_srcdir/mes:$abs_top_srcdir/guix${GUILE_LOAD_PATH:+:}$GUILE_LOAD_PATH"

@@ -4,7 +4,7 @@
 ;;; Copyright (C) 1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007
 ;;; Free Software Foundation, Inc.
 ;;; Copyright (C) 2019,2020,2024 Janneke Nieuwenhuizen <janneke@gnu.org>
-;;; Copyright (C) 2022 Timothy Smaple <samplet@ngyro.com>
+;;; Copyright (C) 2022,2026 Timothy Smaple <samplet@ngyro.com>
 ;;;
 ;;; This file is part of GNU Mes.
 ;;;
@@ -65,7 +65,7 @@
   (filter (lambda (x) (not (equal? x item))) lst))
 
 (define make-weak-value-hash-table make-hash-table)
-(define (%get-pre-modules-obarray) (initial-module))
+(define (%get-pre-modules-obarray) (module-obarray (initial-module)))
 (define (make-mutex) '*mutex*)
 (define (lock-mutex m) #t)
 (define (unlock-mutex m) #t)
@@ -92,21 +92,6 @@
 
 
 
-;;; {Mes: The standard eval-closure}
-;;;
-;;; Note that we need to avoid lookups in these procedures, since that
-;;; would cause infinite recursion.  To do this, we define stubs for the
-;;; module procedures we need, and early bind all the non-macro globals
-;;; that we need.
-;;;
-
-(define (standard-eval-closure m)
-  'standard-eval-closure)
-(define (standard-interface-eval-closure m)
-  'standard-interface-eval-closure)
-
-
-
 ;;; {EVAL-CASE}
 ;;;
 
@@ -117,27 +102,24 @@
 ;; triggers for code evaluated at the top-level, for example from the
 ;; REPL or when loading a file.
 
-;; Mes: This has been largely rewritten for Mes.
+;; Mes: This has been largely rewritten for Mes, and always runs
+;; 'load-toplevel' expressions.
 
 (define-macro (eval-case . clauses)
-  (define env (gensym 'env))
-  (define tests `((load-toplevel . (or (not (pair? ,env))
-                                       (not (pair? ,env))
-                                       (not (eq? '*closure* (caar ,env)))))))
-  `(let ((,env (current-environment)))
-     (cond ,@(map (lambda (clause)
-                    (cond
-                     ((not (list? clause))
-                      (error "syntax error in eval-case"))
-                     ((eq? 'else (car clause))
-                      clause)
-                     ((not (list? (car clause)))
-                      (error "syntax error in eval-case"))
-                     (else `((or ,@(map (lambda (test)
-                                          (assq-ref tests test))
-                                        (car clause)))
-                             ,@(cdr clause)))))
-                  clauses))))
+  (define tests `((load-toplevel . #t)))
+  `(cond ,@(map (lambda (clause)
+                  (cond
+                   ((not (list? clause))
+                    (error "syntax error in eval-case"))
+                   ((eq? 'else (car clause))
+                    clause)
+                   ((not (list? (car clause)))
+                    (error "syntax error in eval-case"))
+                   (else `((or ,@(map (lambda (test)
+                                        (assq-ref tests test))
+                                      (car clause)))
+                           ,@(cdr clause)))))
+                clauses)))
 
 
 
@@ -230,55 +212,7 @@
 ;;; Every module object is of the type 'module-type', which is a record
 ;;; consisting of the following members:
 ;;;
-;;; - eval-closure: the function that defines for its module the strategy that
-;;;   shall be followed when looking up symbols in the module.
-;;;
-;;;   An eval-closure is a function taking two arguments: the symbol to be
-;;;   looked up and a boolean value telling whether a binding for the symbol
-;;;   should be created if it does not exist yet.  If the symbol lookup
-;;;   succeeded (either because an existing binding was found or because a new
-;;;   binding was created), a variable object representing the binding is
-;;;   returned.  Otherwise, the value #f is returned.  Note that the eval
-;;;   closure does not take the module to be searched as an argument: During
-;;;   construction of the eval-closure, the eval-closure has to store the
-;;;   module it belongs to in its environment.  This means, that any
-;;;   eval-closure can belong to only one module.
-;;;
-;;;   The eval-closure of a module can be defined arbitrarily.  However, three
-;;;   special cases of eval-closures are to be distinguished: During startup
-;;;   the module system is not yet activated.  In this phase, no modules are
-;;;   defined and all bindings are automatically stored by the system in the
-;;;   pre-modules-obarray.  Since no eval-closures exist at this time, the
-;;;   functions which require an eval-closure as their argument need to be
-;;;   passed the value #f.
-;;;
-;;;   The other two special cases of eval-closures are the
-;;;   standard-eval-closure and the standard-interface-eval-closure.  Both
-;;;   behave equally for the case that no new binding is to be created.  The
-;;;   difference between the two comes in, when the boolean argument to the
-;;;   eval-closure indicates that a new binding shall be created if it is not
-;;;   found.
-;;;
-;;;   Given that no new binding shall be created, both standard eval-closures
-;;;   define the following standard strategy of searching bindings in the
-;;;   module: First, the module's obarray is searched for the symbol.  Second,
-;;;   if no binding for the symbol was found in the module's obarray, the
-;;;   module's binder procedure is exececuted.  If this procedure did not
-;;;   return a binding for the symbol, the modules referenced in the module's
-;;;   uses list are recursively searched for a binding of the symbol.  If the
-;;;   binding can not be found in these modules also, the symbol lookup has
-;;;   failed.
-;;;
-;;;   If a new binding shall be created, the standard-interface-eval-closure
-;;;   immediately returns indicating failure.  That is, it does not even try
-;;;   to look up the symbol.  In contrast, the standard-eval-closure would
-;;;   first search the obarray, and if no binding was found there, would
-;;;   create a new binding in the obarray, therefore not calling the binder
-;;;   procedure or searching the modules in the uses list.
-;;;
-;;;   The explanation of the following members obarray, binder and uses
-;;;   assumes that the symbol lookup follows the strategy that is defined in
-;;;   the standard-eval-closure and the standard-interface-eval-closure.
+;;; - eval-closure: deprecated field.
 ;;;
 ;;; - obarray: a hash table that maps symbols to variable objects.  In this
 ;;;   hash table, the definitions are found that are local to the module (that
@@ -393,14 +327,16 @@
 ;; bindings that would otherwise not be found locally in the module.
 ;;
 ;; NOTE: If you change anything here, you also need to change
-;; libguile/modules.h.
+;; src/module.c. That file defines the module type like so:
 ;;
-(define module-type
-  (make-record-type 'module
-		    '(obarray uses binder eval-closure transformer name kind
-		      duplicates-handlers duplicates-interface
-		      observers weak-observers observer-id)
-		    %print-module))
+;; (define module-type
+;;   (make-record-type 'module
+;; 		    '(obarray uses binder eval-closure transformer name kind
+;; 		      duplicates-handlers duplicates-interface
+;; 		      observers weak-observers observer-id)
+;; 		    %print-module))
+
+(struct-set! module-type 3 %print-module)
 
 ;; make-module &opt size uses binder
 ;;
@@ -431,18 +367,11 @@
 	    (error
 	     "Lazy-binder expected to be a procedure or #f." binder))
 
-	(let ((module (module-constructor (make-hash-table size)
-					  uses binder #f #f #f #f #f #f
-					  '()
-					  (make-weak-value-hash-table 31)
-					  0)))
-
-	  ;; We can't pass this as an argument to module-constructor,
-	  ;; because we need it to close over a pointer to the module
-	  ;; itself.
-	  (set-module-eval-closure! module (standard-eval-closure module))
-
-	  module))))
+  (module-constructor (make-hash-table size)
+                      uses binder #f #f #f #f #f #f
+                      '()
+                      (make-weak-value-hash-table 31)
+                      0))))
 
 (define module-constructor (record-constructor module-type))
 (define module-obarray  (record-accessor module-type 'obarray))
@@ -451,10 +380,6 @@
 (define set-module-uses! (record-modifier module-type 'uses))
 (define module-binder (record-accessor module-type 'binder))
 (define set-module-binder! (record-modifier module-type 'binder))
-
-;; NOTE: This binding is used in libguile/modules.c.
-(define module-eval-closure (record-accessor module-type 'eval-closure))
-
 (define module-transformer (record-accessor module-type 'transformer))
 (define set-module-transformer! (record-modifier module-type 'transformer))
 (define module-name (record-accessor module-type 'name))
@@ -475,16 +400,6 @@
 (define module-observer-id (record-accessor module-type 'observer-id))
 (define set-module-observer-id! (record-modifier module-type 'observer-id))
 (define module? (record-predicate module-type))
-
-(define set-module-eval-closure!
-  (let ((setter (record-modifier module-type 'eval-closure)))
-    (lambda (module closure)
-      (setter module closure)
-      ;; Make it possible to lookup the module from the environment.
-      ;; This implementation is correct since an eval closure can belong
-      ;; to maximally one module.
-      (set-procedure-property! closure 'module module))))
-
 
 
 ;;; {Observer protocol}
@@ -680,7 +595,6 @@
 (define (module-variable m v)
   (module-search module-local-variable m v))
 
-
 ;;; {Mapping modules x symbols --> bindings}
 ;;;
 ;;; These are similar to the mapping to variables, except that the
@@ -827,7 +741,6 @@
 (define (make-scm-module)
   (let ((m (make-module 0)))
     (set-module-obarray! m (%get-pre-modules-obarray))
-    (set-module-eval-closure! m (standard-interface-eval-closure m))
     m))
 
 
@@ -1057,15 +970,12 @@
   (module-ref m '%module-public-interface #f))
 (define (set-module-public-interface! m i)
   (module-define! m '%module-public-interface i))
-(define (set-system-module! m s)
-  (set-procedure-property! (module-eval-closure m) 'system-module s))
 (define the-root-module (make-root-module))
 (define the-scm-module (make-scm-module))
 (set-module-public-interface! the-root-module the-scm-module)
 (set-module-name! the-root-module '(guile))
 (set-module-name! the-scm-module '(guile))
 (set-module-kind! the-scm-module 'interface)
-(for-each set-system-module! (list the-root-module the-scm-module) '(#t #t))
 
 ;; NOTE: This binding is used in libguile/modules.c.
 ;;
@@ -1300,7 +1210,6 @@
 		   re-exports
 		   replacements))
 	    ((#:no-backtrace)
-	     (set-system-module! module #t)
 	     (loop (cdr kws) reversed-interfaces exports re-exports replacements))
 	    ((#:pure)
 	     (purify-module! module)
@@ -1572,8 +1481,8 @@
 ;; Dirk:FIXME:: This incorrect (according to R5RS) syntax needs to be changed
 ;; as soon as guile supports hygienic macros.
 
-;; Mes: FIXME: This causes a segmentation fault.
-;;(define define-private define)
+(defmacro define-private args
+  (cons 'define args))
 
 (defmacro define-public args
   (define (syntax)

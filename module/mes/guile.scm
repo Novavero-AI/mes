@@ -3,6 +3,7 @@
 ;;; GNU Mes --- Maxwell Equations of Software
 ;;; Copyright © 2017,2018 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
 ;;; Copyright © 2023 Ekaitz Zarraga <ekaitz@elenq.tech>
+;;; Copyright © 2026 Timothy Sample <samplet@ngyro.com>
 ;;;
 ;;; This file is part of GNU Mes.
 ;;;
@@ -48,6 +49,7 @@
             core:write-error
             core:write-port
             core:type
+            initial-module
             equal2?
             keyword->string
             pmatch-car
@@ -73,7 +75,7 @@
   (define (core:write-error o) (write o (current-error-port)))
   (define core:write-port write)
   (define core:macro-expand identity)
-  (define (core:apply f a . m) (apply f a))
+  (define core:apply apply)
   (define (core:car f a . m) (apply f a))
   (define append2 append)
   (define equal2? equal?)
@@ -122,7 +124,11 @@
           ((guile:string? x) <cell:string>)
           ((guile:symbol? x) <cell:symbol>)))
   (define (core:car x)
-    (cond ((guile:string? x) (string->list x)))))
+    (cond ((guile:string? x) (string->list x))))
+
+  (define initial-module
+    (let ((m (current-module)))
+      (lambda () m))))
  (mes))
 
 (cond-expand

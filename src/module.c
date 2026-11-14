@@ -2,6 +2,7 @@
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2018,2019,2022 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
  * Copyright © 2022 Timothy Sample <samplet@ngyro.com>
+ * Copyright © 2025,2026 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -19,21 +20,91 @@
  * along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** Commentary:
+    Essential module system interface and initial module definition for
+    bootstrapping. See: mes/module/mes/guile-module.mes
+ */
+
+/** Code: */
+
 #include "mes/lib.h"
 #include "mes/mes.h"
+
+enum module_fields
+{
+  MODULE_OBARRAY = 3,
+  MODULE_USES,
+  MODULE_BINDER,
+  MODULE_EVAL_CLOSURE,
+  MODULE_TRANSFORMER,
+  MODULE_NAME,
+  MODULE_KIND,
+  MODULE_DUPLICATES_HANDLERS,
+  MODULE_DUPLICATES_INTERFACE,
+  MODULE_OBSERVERS,
+  MODULE_WEAK_OBSERVERS,
+  MODULE_OBSERVER_ID
+};
+
+struct scm *
+make_module_type ()     /*:((internal)) */
+{
+  if (scm_module_type == 0)
+    {
+      struct scm *type_name = cstring_to_symbol ("<module>");
+      struct scm *fields = cell_nil;
+      fields = cons (cstring_to_symbol ("observer-id"), fields);
+      fields = cons (cstring_to_symbol ("weak-observers"), fields);
+      fields = cons (cstring_to_symbol ("observers"), fields);
+      fields = cons (cstring_to_symbol ("duplicates-interface"), fields);
+      fields = cons (cstring_to_symbol ("duplicates-handlers"), fields);
+      fields = cons (cstring_to_symbol ("kind"), fields);
+      fields = cons (cstring_to_symbol ("name"), fields);
+      fields = cons (cstring_to_symbol ("transformer"), fields);
+      fields = cons (cstring_to_symbol ("eval-closure"), fields);
+      fields = cons (cstring_to_symbol ("binder"), fields);
+      fields = cons (cstring_to_symbol ("uses"), fields);
+      fields = cons (cstring_to_symbol ("obarray"), fields);
+
+      fields = cons (fields, cell_nil);     /* type-field */
+      fields = cons (cell_f, fields);       /* type-printer */
+      fields = cons (type_name, fields);    /* type-name */
+      scm_module_type = make_struct (cell_symbol_record_type, fields, cell_unspecified);
+    }
+  return scm_module_type;
+}
+
 
 struct scm *
 make_initial_module (struct scm *a)     /*:((internal)) */
 {
   struct scm *var;
-  struct scm *module = make_hash_table_ (100);
+  struct scm *obarray = make_hash_table_ (100);
   while (a->type == TPAIR)
     {
       var = make_variable (a->car->cdr);
-      hashq_set_x (module, a->car->car, var);
+      hashq_set_x (obarray, a->car->car, var);
       a = a->cdr;
     }
-  return module;
+
+  struct scm *name = cstring_to_symbol ("initial-module");
+
+  struct scm *values = cell_nil;
+  values = cons (make_number (0),  values);       /* observer-id */
+  values = cons (make_hash_table_ (1), values);   /* weak-observers */
+  values = cons (cell_f,  values);                /* observers */
+  values = cons (cell_f,  values);                /* duplicates-interface */
+  values = cons (cell_f,  values);                /* duplicates-handlers */
+  values = cons (cell_f,  values);                /* kind */
+  values = cons (name,    values);                /* name */
+  values = cons (cell_f,  values);                /* transformer */
+  values = cons (cell_f,  values);                /* eval-closure */
+  values = cons (cell_f,  values);                /* binder */
+  values = cons (cell_nil,values);                /* uses */
+  values = cons (obarray, values);                /* obarray */
+  values = cons (cstring_to_symbol ("module"), values);
+
+  return make_struct (scm_module_type, values, cell_nil);
 }
 
 struct scm *
@@ -45,7 +116,10 @@ initial_module ()
 struct scm *
 current_module ()
 {
-  return M1;
+  if (M1 == cell_f)
+    return initial_module ();
+  else
+    return M1;
 }
 
 struct scm *
@@ -57,74 +131,26 @@ set_current_module (struct scm *module)
 }
 
 struct scm *
-current_module_variable (struct scm *name, struct scm *define_p)
-{
-  struct scm *module = current_module ();
-
-  /* When '(current-module)' is false, that means the module system is
-     not yet booted.  In that case, we lookup variables in the initial
-     module hash table. */
-  if (module == cell_f)
-    {
-      module = initial_module ();
-      struct scm *variable = hashq_ref_ (module, name, cell_f);
-      if (variable == cell_f && define_p != cell_f)
-        return hashq_set_x (module, name, make_variable (cell_undefined));
-      else
-        return variable;
-    }
-
-  /* The module system is booted.  We can use the current module's
-     'eval-closure' procedure.  We take it on faith that whatever is in
-     'M1' is a module. */
-  struct scm *eval_closure = struct_ref_ (module, MODULE_EVAL_CLOSURE);
-
-  /* If the module's "eval-closure" is the standard one, we can save
-     time by performing the lookup without calling into Scheme code. */
-  if (eval_closure == cell_symbol_standard_eval_closure)
-    return standard_eval_closure (name, define_p);
-  else if (eval_closure == cell_symbol_standard_interface_eval_closure)
-    return standard_interface_eval_closure (name, define_p);
-
-  /* Otherwise, we assume it's a closure, and defer to it for the
-     lookup. */
-  struct scm *args = cell_nil;
-  args = cons (define_p, args);
-  args = cons (name, args);
-  /* XXX: Calling 'apply' does not restore the registers properly.  We
-     work around it here, but maybe it should be fixed in 'apply'. */
-  gc_push_frame ();
-  struct scm *result = apply (eval_closure, args, cell_nil);
-  gc_pop_frame ();
-  return result;
-}
-
-struct scm *
-standard_eval_closure (struct scm *name, struct scm *define_p)
-{
-  if (define_p != cell_f)
-    return module_make_local_var_x (M1, name);
-  return module_variable (M1, name);
-}
-
-struct scm *
-standard_interface_eval_closure (struct scm *name, struct scm *define_p)
-{
-  if (define_p != cell_f)
-    return cell_f;
-  return module_variable (M1, name);
-}
-
-struct scm *
-module_make_local_var_x (struct scm *module, struct scm *name)
+module_local_variable (struct scm *module, struct scm *name)
 {
   struct scm *obarray = struct_ref_ (module, MODULE_OBARRAY);
-  struct scm *variable = make_variable (cell_undefined);
-  struct scm *handle = hashq_create_handle_x (obarray, name, variable);
+  return hashq_ref_ (obarray, name, cell_f);
+}
 
-  /* TODO: Call 'module-modified' to invoke obervers, but only if there
-     are observers, since we are trying to avoid Scheme code. */
+struct scm *
+module_ensure_local_variable_x (struct scm *module, struct scm *name)
+{
+  /* Ensure that there is a local variable in MODULE for SYMBOL.  If
+   * there is no binding for SYMBOL, create a new uninitialized
+   * variable.  Return the local variable.
+   */
+  struct scm *var = module_local_variable (module, name);
+  if (var != cell_f)
+    return var;
 
+  struct scm *obarray = struct_ref_ (module, MODULE_OBARRAY);
+  var = make_variable (cell_undefined);
+  struct scm *handle = hashq_create_handle_x (obarray, name, var);
   return handle->cdr;
 }
 
@@ -132,21 +158,24 @@ struct scm *
 module_variable (struct scm *module, struct scm *name)
 {
   struct scm *modules = cons (module, cell_nil);
-  struct scm *obarray;
   struct scm *variable;
   struct scm *uses;
   while (modules->type == TPAIR)
     {
       module = modules->car;
-      obarray = struct_ref_ (module, MODULE_OBARRAY);
-      variable = hashq_ref_ (obarray, name, cell_f);
+      variable = module_local_variable (module, name);
       if (variable != cell_f)
           return variable;
-
-      /* TODO: Call binders. */
 
       uses = struct_ref_ (module, MODULE_USES);
       modules = append2 (uses, modules->cdr);
     }
   return cell_f;
+}
+
+struct scm *
+module_define_x (struct scm *module, struct scm *name, struct scm *value)
+{
+  struct scm *variable = module_ensure_local_variable_x (module, name);
+  return variable_set_x (variable, value);
 }

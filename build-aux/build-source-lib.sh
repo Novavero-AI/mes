@@ -31,8 +31,27 @@ srcdest=${srcdest-}
 mkdir -p $mes_cpu-mes
 cp ${srcdest}lib/$mes_kernel/$mes_cpu-mes-$compiler/crt*.c $mes_cpu-mes
 
-rm -f libc+gnu.c
-cat > libc+gnu.c <<EOF
+echo "  GEN        $mes_cpu-mes/libc+tcc.c"
+rm -f $mes_cpu-mes/libc+tcc.c
+cat > $mes_cpu-mes/libc+tcc.c <<EOF
+// Generated from Mes -- do not edit
+// compiler: $compiler
+// cpu:      $mes_cpu
+// bits:     $mes_bits
+// libc:     $mes_libc
+// kernel:   $mes_kernel
+// system:   $mes_system
+
+EOF
+for c in $libc_tcc_SOURCES; do
+    echo "// $c" >> $mes_cpu-mes/libc+tcc.c
+    cat ${srcdest}$c >> $mes_cpu-mes/libc+tcc.c
+    echo >> $mes_cpu-mes/libc+tcc.c
+done
+
+echo "  GEN        $mes_cpu-mes/libc+gnu.c"
+rm -f $mes_cpu-mes/libc+gnu.c
+cat > $mes_cpu-mes/libc+gnu.c <<EOF
 // Generated from Mes -- do not edit
 // compiler: $compiler
 // cpu:      $mes_cpu

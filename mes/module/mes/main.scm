@@ -1,6 +1,6 @@
 ;;; GNU Mes --- Maxwell Equations of Software
 ;;; Copyright © 2016,2017,2018,2019,2024 Janneke Nieuwenhuizen <janneke@gnu.org>
-;;; Copyright © 2022 Timothy Sample <samplet@ngyro.com>
+;;; Copyright © 2022,2026 Timothy Sample <samplet@ngyro.com>
 ;;;
 ;;; This file is part of GNU Mes.
 ;;;
@@ -90,13 +90,15 @@ General help using GNU software: <http://gnu.org/gethelp/>
                (setenv "GUILE_LOAD_PATH" (string-append (search-path-quote dir) ":" (or (getenv "GUILE_LOAD_PATH") "")))))
       (when command
         (let* ((prev (set-current-input-port (open-input-string command)))
-               (expr (cons 'begin (read-input-file-env (current-module))))
+               (expr (cons 'begin (read-input-file)))
                (set-current-input-port prev))
           (primitive-eval expr)
           (exit 0)))
       (when main
         (let ((proc-name (string->symbol main)))
-          (set! %main (lambda () (apply proc-name (command-line) '())))))
+          (set! %main (lambda ()
+                        (let ((proc (module-ref (current-module) proc-name)))
+                          (apply proc (command-line) '()))))))
       (cond ((pair? files)
              (let ((file (car files)))
                (set! %argv files)

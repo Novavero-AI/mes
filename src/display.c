@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2016,2017,2018,2019,2023 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -108,9 +109,10 @@ display_helper (struct scm *x, int cont, char *sep, int fd, int write_p)
     return cell_unspecified;
   g_depth = g_depth - 1;
 
-  int t = x->type;
-  if (t == TCHAR)
+  enum cell_type t = x->type;
+  switch (t)
     {
+    case TCHAR:
       if (write_p == 0)
         fdputc (x->value, fd);
       else
@@ -118,36 +120,34 @@ display_helper (struct scm *x, int cont, char *sep, int fd, int write_p)
           fdputs ("#", fd);
           fdwrite_char (x->value, fd);
         }
-    }
-  else if (t == TCLOSURE)
-    {
-      fdputs ("#<closure ", fd);
-      struct scm *circ = x->cdr->car;
-      struct scm *name = circ->cdr->car;
-      struct scm *args = x->cdr->cdr->car;
-      display_helper (name->car, 0, "", fd, 0);
-      fdputc (' ', fd);
-      display_helper (args, 0, "", fd, 0);
+      break;
+    case TCLOSURE:
+      fdputs ("#<procedure ", fd);
+      display_helper (procedure_name (x), 0, "", fd, 0);
+      display_helper (procedure_arguments (x), 0, " ", fd, 0);
       fdputs (">", fd);
-    }
-  else if (t == TMACRO)
-    {
-      fdputs ("#<macro ", fd);
-      display_helper (x->cdr, cont, "", fd, 0);
+      break;
+    case TFRAME:
+      fdputs ("#<frame ", fd);
+      fdputs ("fp: ", fd);
+      fdputs (ltoa (x->frame.fp), fd);
+      fdputs (" pc: ", fd);
+      fdputs (ltoa (x->frame.pc), fd);
+      fdputs (" closure: ", fd);
+      display_helper (x->closure, 1, "", fd, 0);
       fdputs (">", fd);
-    }
-  else if (t == TBINDING)
-    {
+      break;
+    case TBINDING:
       fdputs ("#<binding ", fd);
-      display_helper (x->binding->car, cont, "", fd, 0);
+      display_helper (x->name, cont, "", fd, 0);
+      fdputs (": ", fd);
+      display_helper (x->binding, cont, "", fd, 0);
       fdputs (">", fd);
-    }
-  else if (t == TNUMBER)
-    {
+      break;
+    case TNUMBER:
       fdputs (ltoa (x->value), fd);
-    }
-  else if (t == TPAIR)
-    {
+      break;
+    case TPAIR:
       if (cont == 0)
         fdputs ("(", fd);
       if (x->car == cell_circular && x->cdr->car != cell_closure)
@@ -179,9 +179,8 @@ display_helper (struct scm *x, int cont, char *sep, int fd, int write_p)
         }
       if (cont == 0)
         fdputs (")", fd);
-    }
-  else if (t == TPORT)
-    {
+      break;
+    case TPORT:
       fdputs ("#<port ", fd);
       fdputs (ltoa (x->port), fd);
       fdputs (" ", fd);
@@ -190,14 +189,12 @@ display_helper (struct scm *x, int cont, char *sep, int fd, int write_p)
       fdwrite_string (cell_bytes (x->string), x->length, fd);
       fdputc ('"', fd);
       fdputs (">", fd);
-    }
-  else if (t == TKEYWORD)
-    {
+      break;
+    case TKEYWORD:
       fdputs ("#:", fd);
       fdwrite_string (cell_bytes (x->string), x->length, fd);
-    }
-  else if (t == TSTRING)
-    {
+      break;
+    case TSTRING:
       if (write_p == 1)
         {
           fdputc ('"', fd);
@@ -206,53 +203,67 @@ display_helper (struct scm *x, int cont, char *sep, int fd, int write_p)
         }
       else
         fdputs (cell_bytes (x->string), fd);
-    }
-  else if (t == TSPECIAL || t == TSYMBOL)
-    fdwrite_string (cell_bytes (x->string), x->length, fd);
-  else if (t == TREF)
-    fdisplay_ (x->ref, fd, write_p);
-  else if (t == TSTRUCT)
-    {
-      struct scm *printer = struct_ref_ (x, STRUCT_PRINTER);
-      if (printer->type == TREF)
-        printer = printer->ref;
-      if (printer->type == TCLOSURE || builtin_p (printer) == cell_t)
-        apply (printer, cons (x, cell_nil), R0);
-      else
-        {
-          fdputs ("#<", fd);
-          fdisplay_ (x->structure, fd, write_p);
-          struct scm *t = x->car;
-          long size = x->length;
-          long i;
-          for (i = 2; i < size; i = i + 1)
-            {
+      break;
+    case TSPECIAL:
+    case TSYMBOL:
+      fdwrite_string (cell_bytes (x->string), x->length, fd);
+      break;
+    case TCONTINUATION:
+      fdputs ("#<continuation", fd);
+      /* TODO: fix me */
+      display_helper (x->stack, 0, " ", fd, write_p);
+      fdputc ('>', fd);
+      break;
+    case TVARIABLE:
+      fdputs ("#<variable", fd);
+      display_helper (x->variable, 0, " ", fd, write_p);
+      fdputc ('>', fd);
+      break;
+    case TBUILTIN:
+      fdputs ("#<builtin", fd);
+      display_helper (builtin_name (x), 0, " ", fd, write_p);
+      fdputc ('>', fd);
+      break;
+    case TSTRUCT:
+      {
+        struct scm *printer = struct_ref_ (x, STRUCT_PRINTER);
+        if (printer->type == TCLOSURE || printer->type == TBUILTIN )
+          apply (printer, cons (x, cell_nil));
+        else
+          {
+            fdputs ("#<", fd);
+            long size = x->length;
+            long i;
+            for (i = 2; i < size; i = i + 1)
+              {
+                fdputc (' ', fd);
+                fdisplay_ (struct_ref_ (x, i), fd, write_p);
+              }
+            fdputc ('>', fd);
+          }
+        break;
+      }
+  case TVECTOR:
+      {
+        fdputs ("#(", fd);
+        struct scm *t = x->car;
+        long i;
+        for (i = 0; i < x->length; i = i + 1)
+          {
+            if (i != 0)
               fdputc (' ', fd);
-              fdisplay_ (cell_ref (x->structure, i), fd, write_p);
-            }
-          fdputc ('>', fd);
-        }
-    }
-  else if (t == TVECTOR)
-    {
-      fdputs ("#(", fd);
-      struct scm *t = x->car;
-      long i;
-      for (i = 0; i < x->length; i = i + 1)
-        {
-          if (i != 0)
-            fdputc (' ', fd);
-          fdisplay_ (cell_ref (x->vector, i), fd, write_p);
-        }
-      fdputc (')', fd);
-    }
-  else
-    {
+            fdisplay_ (vector_ref_ (x, i), fd, write_p);
+          }
+        fdputc (')', fd);
+        break;
+      }
+    default:
       fdputs ("<", fd);
       fdputs (ltoa (t), fd);
       fdputs (":", fd);
-      fdputs (ltoa (cast_voidp_to_long (x)), fd);
+      fdputs (ltoa ((long) x), fd);
       fdputs (">", fd);
+      break;
     }
   return cell_unspecified;
 }
@@ -274,7 +285,8 @@ display_error_ (struct scm *x)
 struct scm *
 display_port_ (struct scm *x, struct scm *p)
 {
-  assert_msg (p->type == TNUMBER, "p->type == TNUMBER");
+  if (p->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg, cons (p, cstring_to_symbol ("core:display-port")));
   return fdisplay_ (x, p->value, 0);
 }
 
@@ -295,7 +307,8 @@ write_error_ (struct scm *x)
 struct scm *
 write_port_ (struct scm *x, struct scm *p)
 {
-  assert_msg (p->type == TNUMBER, "p->type == TNUMBER");
+  if (p->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg, cons (p, cstring_to_symbol ("core:write-port")));
   return fdisplay_ (x, p->value, 1);
 }
 

@@ -1,7 +1,7 @@
 #! @SHELL@
 
 # GNU Mes --- Maxwell Equations of Software
-# Copyright © 2019 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2019, 2025 Janneke Nieuwenhuizen <janneke@gnu.org>
 #
 # This file is part of GNU Mes.
 #
@@ -73,6 +73,7 @@ if [ $# -eq 0 ]; then
     exit 2
 fi
 M1_archive=$(dirname "$archive")/$(basename "$archive" .a).s
+M1_objects=${M1_objects-}
 for o in "$@"; do
     s=$(dirname "$o")/$(basename "$o" .o).s
     M1_objects="$M1_objects $s"

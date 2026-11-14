@@ -46,10 +46,10 @@
       (if handle (set-cdr! handle value)
           (error "invalid fluid" fluid))))
 
-  (hashq-set! (initial-module) 'make-fluid (make-variable make-fluid))
-  (hashq-set! (initial-module) 'fluid? (make-variable fluid?))
-  (hashq-set! (initial-module) 'fluid-ref (make-variable fluid-ref))
-  (hashq-set! (initial-module) 'fluid-set! (make-variable fluid-set!)))
+  (module-define! (initial-module) 'make-fluid make-fluid)
+  (module-define! (initial-module) 'fluid? fluid?)
+  (module-define! (initial-module) 'fluid-ref fluid-ref)
+  (module-define! (initial-module) 'fluid-set! fluid-set!))
 
 (define (with-fluid* fluid value thunk)
   (let ((outer-value #f)

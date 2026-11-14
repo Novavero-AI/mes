@@ -91,10 +91,11 @@
     (when (and verbose? (> verbose? 1))
       (format (current-error-port) "includes: ~s\n" includes)
       (format (current-error-port) "defines: ~s\n" defines))
-    (parse-c99
-     #:inc-dirs includes
-     #:cpp-defs defines
-     #:mode 'code)))
+    (or (parse-c99
+         #:inc-dirs includes
+         #:cpp-defs defines
+         #:mode 'code)
+        (error "mescc: preprocess failed:" #f))))
 
 (define* (c99-input->ast #:key (prefix "") (defines '()) (includes '()) (arch "") verbose?)
   (when verbose?

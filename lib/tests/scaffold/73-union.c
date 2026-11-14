@@ -1,6 +1,6 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
- * Copyright © 2017 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2017,2026 Janneke Nieuwenhuizen <janneke@gnu.org>
  *
  * This file is part of GNU Mes.
  *
@@ -18,23 +18,14 @@
  * along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mes/lib.h>
 #include <stdio.h>
 
 typedef union foo
 {
-  char c;
   int i;
+  char c;
   void *p;
 } foo;
-
-typedef union
-{
-  char c;
-  int i;
-  void *p;
-} bar;
-
 
 int
 main ()

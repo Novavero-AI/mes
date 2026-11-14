@@ -1,7 +1,8 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2016,2017,2018,2019,2020,2022,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
- * Copyright © Timothy Sample 2022 <samplet@ngyro.com>
+ * Copyright © Timothy Sample 2022,2026 <samplet@ngyro.com>
+ * Copyright © 2025,2026 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -19,1054 +20,696 @@
  * along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/** Commentary:
+    Evaluation machinery.
+ */
+
+/** Code: */
+
 #include "mes/lib.h"
 #include "mes/mes.h"
 
 #include <string.h>
 
-struct scm *
-assert_defined (struct scm *x, struct scm *e)   /*:((internal)) */
+#if __M2__
+void
+stack_init ()
 {
-  if (e == cell_undefined)
-    return error (cell_symbol_unbound_variable, x);
-  return e;
+  g_stack = 0;
 }
-
 struct scm *
-check_formals (struct scm *f, struct scm *formals, struct scm *args)    /*:((internal)) */
+stack_index (long i)
 {
-  long flen;
-  if (formals->type == TNUMBER)
-    flen = formals->value;
-  else
-    flen = length__ (formals);
-  long alen = length__ (args);
-  if (alen != flen && alen != -1 && flen != -1)
-    {
-      char *s = "apply: wrong number of arguments; expected: ";
-      eputs (s);
-      eputs (itoa (flen));
-      eputs (", got: ");
-      eputs (itoa (alen));
-      eputs ("\n");
-      write_error_ (f);
-      struct scm *e = make_string0 (s);
-      return error (cell_symbol_wrong_number_of_args, cons (e, f));
-    }
-  return cell_unspecified;
+  char *c = (char *)STACK + i * M2_PTR_SIZE;
+  struct scm **t = (struct scm **)c;
+  return *t;
 }
-
+void
+stack_set (long i, struct scm *v)
+{
+  char *c = (char *)(STACK) + i * M2_PTR_SIZE;
+  struct scm **t = (struct scm **)c;
+  *t = v;
+}
+void
+stack_push (struct scm *x)
+{
+  stack_set (g_stack, x);
+  g_stack = g_stack + 1;
+}
 struct scm *
-check_apply (struct scm *f, struct scm *e)      /*:((internal)) */
+stack_pop ()
 {
-  char *type = 0;
-  if (f == cell_f || f == cell_t)
-    type = "bool";
-  if (f == cell_nil)
-    type = "nil";
-  if (f == cell_unspecified)
-    type = "*unspecified*";
-  if (f == cell_undefined)
-    type = "*undefined*";
-  if (f->type == TCHAR)
-    type = "char";
-  if (f->type == TNUMBER)
-    type = "number";
-  if (f->type == TSTRING)
-    type = "string";
-  if (f->type == TSTRUCT && builtin_p (f) == cell_f)
-    type = "#<...>";
-  if (f->type == TBROKEN_HEART)
-    type = "<3";
-
-  if (type != 0)
-    {
-      char *s = "cannot apply: ";
-      eputs (s);
-      eputs (type);
-      eputs ("[");
-      write_error_ (e);
-      eputs ("]\n");
-      struct scm *e = make_string0 (s);
-      return error (cell_symbol_wrong_type_arg, cons (e, f));
-    }
-  return cell_unspecified;
+  g_stack = g_stack - 1;
+  return stack_index (g_stack);
 }
-
+void
+stack_drop (long n)
+{
+  g_stack -= n;
+}
 struct scm *
-pairlis (struct scm *x, struct scm *y, struct scm *a)
+stack_peek ()
 {
-  if (x == cell_nil)
-    return a;
-  if (x->type != TPAIR)
-    return cons (cons (x, y), a);
-  return cons (cons (car (x), car (y)), pairlis (cdr (x), cdr (y), a));
+  return stack_index (g_stack - 1);
 }
-
-struct scm *
-set_car_x (struct scm *x, struct scm *e)
-{
-  if (x->type != TPAIR)
-    error (cell_symbol_not_a_pair, cons (x, cstring_to_symbol ("set-car!")));
-  x->car = e;
-  return cell_unspecified;
-}
-
-struct scm *
-set_cdr_x (struct scm *x, struct scm *e)
-{
-  if (x->type != TPAIR)
-    error (cell_symbol_not_a_pair, cons (x, cstring_to_symbol ("set-cdr!")));
-  x->cdr = e;
-  return cell_unspecified;
-}
-
-struct scm *
-set_x (struct scm *x, struct scm *e, int define_p)
-{
-  struct scm *binding;
-
-  if (x->type == TBINDING)
-    binding = x;
-  else
-    binding = lookup_binding (x, cell_f);
-
-  if (binding == cell_f)
-    return error (cell_symbol_unbound_variable, x);
-
-  if (binding->lexical_p != 0)
-    set_cdr_x (binding->binding, e);
-  else
-    {
-      struct scm *variable = binding->binding->cdr;
-      if (define_p == 0 && variable_ref (variable) == cell_undefined)
-        return error (cell_symbol_unbound_variable, binding->binding->car);
-      variable_set_x (binding->binding->cdr, e);
-    }
-
-  return cell_unspecified;
-}
-
-struct scm *
-call_lambda (struct scm *e, struct scm *x, struct scm *aa)       /*:((internal)) */
-{
-  struct scm *cl = cons (cons (cell_closure, x), x);
-  R1 = e;
-  R0 = cl;
-  return cell_unspecified;
-}
-
-struct scm *
-make_closure_ (struct scm *args, struct scm *body, struct scm *a)       /*:((internal)) */
-{
-  return make_cell (TCLOSURE, cell_f, cons (cons (cell_circular, a), cons (args, body)));
-}
-
-struct scm *
-make_binding_ (struct scm *handle, long lexical_p)      /*:((internal)) */
-{
-  struct scm *binding = make_cell (TBINDING, handle, 0);
-  binding->lexical_p = lexical_p;
-  return binding;
-}
-
-struct scm *
-make_binding (struct scm *name, struct scm *variable)
-{
-  return make_binding_ (cons (name, variable), 0);
-}
-
-struct scm *
-macro_get_handle (struct scm *name)     /*:((internal)) */
-{
-  if (name->type == TSYMBOL)
-    return hashq_get_handle (g_macros, name);
-  return cell_f;
-}
-
-struct scm *
-get_macro (struct scm *name)            /*:((internal)) */
-{
-  struct scm *m = macro_get_handle (name);
-  if (m != cell_f)
-    {
-      struct scm *d = m->cdr;
-      return d->macro;
-    }
-  return cell_f;
-}
-
-struct scm *
-macro_set_x (struct scm *name, struct scm *value)       /*:((internal)) */
-{
-  return hashq_set_x (g_macros, name, value);
-}
-
-struct scm *
-push_cc (struct scm *p1, struct scm *p2, struct scm *a, struct scm *c)  /*:((internal)) */
-{
-  struct scm *x = R3;
-  R3 = c;
-  R2 = p2;
-  gc_push_frame ();
-  R1 = p1;
-  R0 = a;
-  R3 = x;
-  return cell_unspecified;
-}
-
-struct scm *
-lookup_binding (struct scm *name, struct scm *define_p)
-{
-  struct scm *handle = assq (name, R0);
-  if (handle != cell_f)
-    return make_binding_ (handle, 1);
-
-  struct scm *variable = current_module_variable (name, define_p);
-  if (variable != cell_f)
-    return make_binding_ (cons (name, variable), 0);
-
-  return cell_f;
-}
-
-struct scm *
-lookup_value (struct scm *name)
-{
-  struct scm *binding = lookup_binding (name, cell_f);
-  if (binding != cell_f)
-    {
-      if (binding->lexical_p != 0)
-        return binding->binding->cdr;
-      else
-        return variable_ref (binding->binding->cdr);
-    }
-  return cell_undefined;
-}
-
-struct scm *
-add_formals (struct scm *formals, struct scm *x)
-{
-  while (x->type == TPAIR)
-    {
-      formals = cons (x->car, formals);
-      x = x->cdr;
-    }
-  if (x->type == TSYMBOL)
-    formals = cons (x, formals);
-  return formals;
-}
-
 int
-formal_p (struct scm *x, struct scm *formals)   /*:((internal)) */
+stack_empty_p ()
 {
-  if (formals->type == TSYMBOL)
+  return (g_stack == 0);
+}
+void
+stack_rewind_to (long to)
+{
+  stack_drop (g_stack - to);
+}
+#endif /* __M2__*/
+
+void
+stack_print ()    /* for debugging */
+{
+  int i;
+  for (i = g_stack - 1; i >= 0; i--)
     {
-      if (x == formals)
-        return 1;
-      else
-        return 0;
+      eputs (ltoa (i));
+      eputs (":\t");
+      display_ (stack_index (i));
+      eputs ("\n");
     }
-  while (formals->type == TPAIR)
+}
+
+struct scm *
+stack_to_scm ()
+{
+  size_t i;
+  struct scm *stack_vector = make_vector_uninit_ (g_stack);
+  for (i = 0; i < g_stack; i++)
     {
-      if (formals->car == x)
-        break;
-      formals = formals->cdr;
+      struct scm *val = stack_index (i);
+      vector_set_x_ (stack_vector, i, val);
     }
-  if (formals->type == TSYMBOL)
-    return formals == x;
-  return formals->type == TPAIR;
+  return stack_vector;
 }
 
 void
-expand_variable_ (int top_p)        /*:((internal)) */
+stack_from_scm (struct scm *stack)
 {
-  struct scm *a;
-  struct scm *f;
-  struct scm *v;
-
-  /* First add all internal definitions to the current list of
-     formals. */
-  v = R1;
-  while (v->type == TPAIR)
+  size_t l = vector_length (stack)->value;
+  for (g_stack = 0; g_stack < l; 0)
     {
-      a = v->car;
-      if (a == cell_symbol_quote)
-        break;
-      if (a->type == TPAIR)
-        {
-          if (a->car == cell_symbol_define || a->car == cell_symbol_define_macro)
-            {
-              if (a->cdr->car->type == TPAIR)
-                R2 = cons (a->cdr->car->car, R2);
-              else
-                R2 = cons (a->cdr->car, R2);
-            }
-        }
-      v = v->cdr;
-    }
-
-  /* Now do the expansion. */
-  while (R1->type == TPAIR)
-    {
-      a = R1->car;
-      if (a->type == TPAIR)
-        R3 = cons (cons (a, R2), R3);
-      else
-        {
-          if (a == cell_symbol_lambda)
-            {
-              f = R1->cdr->car;
-              R2 = add_formals (R2, f);
-              R1 = R1->cdr;
-            }
-          else if (a == cell_symbol_define || a == cell_symbol_define_macro)
-            {
-              f = R1->cdr->car;
-              if (top_p != 0)
-                {
-                  if (f->type == TPAIR)
-                    f = f->cdr;
-                  else
-                    f = cell_nil;
-                }
-              R2 = add_formals (R2, f);
-              R1 = R1->cdr;
-            }
-          else if (a == cell_symbol_quote)
-            return;
-          else if (a->type == TSYMBOL
-                   && a != cell_symbol_current_environment
-                   && formal_p (a, R2) == 0)
-            {
-              v = lookup_binding (a, cell_f);
-              if (v != cell_f)
-                R1->car = v;
-              else
-                {
-                  /* Lookup the binding again, but this time make a
-                     local definition in case the name becomes bound in
-                     the future. */
-                  R1->car = lookup_binding (a, cell_t);
-                }
-            }
-        }
-      R1 = R1->cdr;
-      top_p = 0;
+      struct scm *x = vector_ref_ (stack, g_stack);
+      stack_push (x);
     }
 }
 
 struct scm *
-expand_variable (struct scm *x, struct scm *formals)    /*:((internal)) */
+make_continuation (struct scm *proc, unsigned short fp, unsigned short pc)
 {
-  gc_push_frame ();
+  return make_cell (TCONTINUATION, make_frame (proc, pc, fp), stack_to_scm ());
+}
 
-  R1 = x;
-  R2 = formals;
-  R3 = cell_nil;
-  expand_variable_ (1);
-
-  while (R3->type == TPAIR)
+struct scm *
+apply (struct scm *fn, struct scm *x)
+{
+  /* No need to eval, just call the function */
+  if (fn->type == TBUILTIN)
     {
-      R1 = R3->car->car;
-      R2 = R3->car->cdr;
-      R3 = R3->cdr;
-      expand_variable_ (0);
+      switch (builtin_arity_ (fn))
+        {
+        case 0:
+          {
+            long argno = length__ (x);
+            if (0 != argno)
+              error (cell_symbol_wrong_number_of_args,
+                     cons (make_number (argno), builtin_name (fn)));
+            function0_t fp = (function0_t) builtin_function (fn);
+            return fp ();
+          }
+        case 1:
+          {
+            long argno = length__ (x);
+            if (1 != argno)
+              error (cell_symbol_wrong_number_of_args,
+                     cons (make_number (argno), builtin_name (fn)));
+            function1_t fp = (function1_t) builtin_function (fn);
+            return fp (x->car);
+          }
+        case 2:
+          {
+            long argno = length__ (x);
+            if (2 != argno)
+              error (cell_symbol_wrong_number_of_args,
+                     cons (make_number (argno), builtin_name (fn)));
+            function2_t fp = (function2_t) builtin_function (fn);
+            return fp (x->car, x->cdr->car);
+          }
+        case 3:
+          {
+            long argno = length__ (x);
+            if (3 != argno)
+              error (cell_symbol_wrong_number_of_args,
+                     cons (make_number (argno), builtin_name (fn)));
+            function3_t fp = (function3_t) builtin_function (fn);
+            return fp (x->car, x->cdr->car, x->cdr->cdr->car);
+          }
+        case -1:
+          {
+            function1_t fp = (function1_t) builtin_function (fn);
+            return fp (x);
+          }
+        default:
+          assert_msg (0, "apply: Unreachable arity in builtin.");
+          return cell_nil;
+        }
     }
 
-  gc_pop_frame ();
+  /* We need to eval code: we create an empty frame as a barrier so we now when
+   * to pause evaluation to come back here.
+   */
+  struct scm *barrier = make_frame (cell_nil, 0, 0);
+  stack_push (barrier);     /* `apply` barrier */
+  stack_push (x);
+  stack_push (fn);
+  struct scm *res = eval_compiled ();   /* returns to the barrier */
+  stack_pop ();
+  return res;
+}
 
+/* The low-level evaluator
+ */
+struct scm *
+display_backtrace (struct scm *kont)
+{
+  if (kont->type != TCONTINUATION)
+    error (cell_symbol_wrong_type_arg,
+           cons (kont, cstring_to_symbol ("display-backtrace")));
+  struct scm *proc_name;
+  struct scm *locals;
+  struct scm *frame = kont->state;
+  struct scm *stack = kont->stack;
+  while (frame->closure != cell_nil)
+    {
+      unsigned int lineno = frame->frame.pc;
+      if (frame->closure != cell_nil)
+        {
+          proc_name = template_name (frame->closure->template);
+          locals = template_locals (frame->closure->template);
+        }
+      display_error_ (proc_name);
+      eputs (":");
+      eputs (ltoa (lineno));
+      eputs ("\n");
+      unsigned int i = 0;
+      unsigned int l = locals->length;
+      for (i = 0; i < l; i = i + 1)
+        {
+          struct scm *binding = vector_ref_ (stack, frame->frame.fp + 1 + i);
+          eputs (" - ");
+          display_error_ (vector_ref_ (locals, i));
+          eputs (" = ");
+          display_error_ (binding->name);
+          eputs (" -> ");
+          display_error_ (binding->binding);
+          eputs ("\n");
+        }
+      frame = vector_ref_ (stack, frame->frame.fp);
+    }
   return cell_unspecified;
 }
 
 struct scm *
-apply_builtin (struct scm *fn, struct scm *x)   /*:((internal)) */
+eval_compiled ()
 {
-  struct scm *a = builtin_arity (fn);
-  struct scm *d;
-  int arity = a->value;
-  if ((arity > 0 || arity == -1) && x != cell_nil)
-    {
-      a = x->car;
-      if (a->type == TVALUES)
-        x = cons (a->cdr->car, x->cdr);
-    }
-  if ((arity > 1 || arity == -1) && x != cell_nil)
-    {
-      a = x->car;
-      d = x->cdr;
-      if (d->type == TPAIR)
-        if (d->car->type == TVALUES)
-          x = cons (a, cons (d->car->cdr->car, d));
-    }
+  /* NOTE: We use the STACK for everything in this function */
 
-  if (arity == 0)
-    return apply_builtin0 (fn);
-  if (arity == 1)
-    return apply_builtin1 (fn, x->car);
-  else if (arity == 2)
-    return apply_builtin2 (fn, x->car, x->cdr->car);
-  else if (arity == 3)
-    return apply_builtin3 (fn, x->car, x->cdr->car, x->cdr->cdr->car);
-  else if (arity == -1)
-    return apply_builtin1 (fn, x);
+  unsigned char inst = OP_UNREACHABLE;
+  unsigned int pc = 0;
+  unsigned int fp = g_stack - 3;
 
-  return cell_unspecified;
-}
+  /* These live in Scheme memory */
+  struct scm *mark = cell_nil;
+  struct scm *proc = cell_nil;
+  unsigned char *code;
+  struct scm *literals = cell_nil;      /* This is cached */
 
-struct scm *
-eval_apply ()
-{
-  struct scm *aa;
-  struct scm *args;
-  struct scm *body;
-  struct scm *cl;
-  struct scm *entry;
-  struct scm *expanders;
-  struct scm *formals;
-  struct scm *input;
-  struct scm *name;
-  struct scm *macro;
-  struct scm *p;
-  struct scm *program;
-  struct scm *sc_expand;
-  struct scm *v;
-  struct scm *x;
-  int global_p;
-  int macro_p;
-  struct scm *a;
-  struct scm *c;
-  struct scm *d;
-  int t;
-  long i;
+  /* Internal temporary values that are shared in fallthroughs */
+  struct scm *fn = cell_nil;
+  long argno = 0;
 
-eval_apply:
-  if (R3 == cell_vm_evlis2)
-    goto evlis2;
-  else if (R3 == cell_vm_evlis3)
-    goto evlis3;
-  else if (R3 == cell_vm_eval_check_func)
-    goto eval_check_func;
-  else if (R3 == cell_vm_eval2)
-    goto eval2;
-  else if (R3 == cell_vm_apply2)
-    goto apply2;
-  else if (R3 == cell_vm_if_expr)
-    goto if_expr;
-  else if (R3 == cell_vm_begin_eval)
-    goto begin_eval;
-  else if (R3 == cell_vm_eval_set_x)
-    goto eval_set_x;
-  else if (R3 == cell_vm_macro_expand_car)
-    goto macro_expand_car;
-  else if (R3 == cell_vm_return)
-    goto vm_return;
-  else if (R3 == cell_vm_macro_expand_cdr)
-    goto macro_expand_cdr;
-  else if (R3 == cell_vm_eval_define)
-    goto eval_define;
-  else if (R3 == cell_vm_macro_expand)
-    goto macro_expand;
-  else if (R3 == cell_vm_macro_expand_lambda)
-    goto macro_expand_lambda;
-  else if (R3 == cell_vm_begin_expand_macro)
-    goto begin_expand_macro;
-  else if (R3 == cell_vm_macro_expand_define)
-    goto macro_expand_define;
-  else if (R3 == cell_vm_begin_expand_eval)
-    goto begin_expand_eval;
-  else if (R3 == cell_vm_call_with_current_continuation2)
-    goto call_with_current_continuation2;
-  else if (R3 == cell_vm_macro_expand_set_x)
-    goto macro_expand_set_x;
-  else if (R3 == cell_vm_macro_expand_define_macro)
-    goto macro_expand_define_macro;
-  else if (R3 == cell_vm_evlis)
-    goto evlis;
-  else if (R3 == cell_vm_apply)
-    goto apply;
-  else if (R3 == cell_vm_eval)
-    goto eval;
-  else if (R3 == cell_vm_eval_macro_expand_eval)
-    goto eval_macro_expand_eval;
-  else if (R3 == cell_vm_eval_macro_expand_expand)
-    goto eval_macro_expand_expand;
-  else if (R3 == cell_vm_begin)
-    goto begin;
-  else if (R3 == cell_vm_begin_expand)
-    goto begin_expand;
-  else if (R3 == cell_vm_if)
-    goto vm_if;
-  else if (R3 == cell_vm_call_with_values2)
-    goto call_with_values2;
-  else if (R3 == cell_unspecified)
-    return R1;
-  else
-    assert_msg (0, "eval/apply unknown continuation");
+#if (__riscv && (__GNUC__ || __TINYC__)) || (!__riscv && !__M2__)
+  int res = setjmp (JMP_BUF);
+  if (res != 0)
+    goto throw;
+#endif
 
-evlis:
-  if (R1 == cell_nil)
-    goto vm_return;
-  if (R1->type != TPAIR)
-    goto eval;
-  push_cc (R1->car, R1, R0, cell_vm_evlis2);
-  goto eval;
-evlis2:
-  push_cc (R2->cdr, R1, R0, cell_vm_evlis3);
-  goto evlis;
-evlis3:
-  R1 = cons (R2, R1);
-  goto vm_return;
-
-apply:
-  g_stack_array[g_stack + GC_FRAME_PROCEDURE] = R1->car;
-  a = R1->car;
-  t = a->type;
-  if (t == TSTRUCT && builtin_p (R1->car) == cell_t)
-    {
-      check_formals (R1->car, builtin_arity (R1->car), R1->cdr);
-      R1 = apply_builtin (R1->car, R1->cdr);
-      goto vm_return;
-    }
-  else if (t == TCLOSURE)
-    {
-      cl = R1->car->closure;
-      body = cl->cdr->cdr;
-      formals = cl->cdr->car;
-      args = R1->cdr;
-      aa = cl->car->cdr;
-      aa = aa->cdr;
-      check_formals (R1->car, formals, R1->cdr);
-      p = pairlis (formals, args, aa);
-      call_lambda (body, p, aa);
-      goto begin;
-    }
-  else if (t == TCONTINUATION)
-    {
-      a = R1->car;
-      v = a->continuation;
-      if (v->length != 0)
-        {
-          for (i = 0; i < v->length; i = i + 1)
-            g_stack_array[STACK_SIZE - v->length + i] = vector_ref_ (v, i);
-          g_stack = STACK_SIZE - v->length;
-        }
-      R1 = R1->cdr->car;
-      goto vm_return;
-    }
-  else if (t == TSPECIAL)
-    {
-      c = R1->car;
-      if (c == cell_vm_apply)
-        {
-          push_cc (cons (R1->cdr->car, R1->cdr->cdr->car), R1, R0, cell_vm_return);
-          goto apply;
-        }
-      else if (c == cell_vm_eval)
-        {
-          push_cc (R1->cdr->car, R1, R1->cdr->cdr->car, cell_vm_return);
-          goto eval;
-        }
-      else if (c == cell_vm_begin_expand)
-        {
-          push_cc (cons (R1->cdr->car, cell_nil), R1, R1->cdr->cdr->car, cell_vm_return);
-          goto begin_expand;
-        }
-      else
-        check_apply (cell_f, R1->car);
-    }
-  else if (t == TSYMBOL)
-    {
-      c = R1->car;
-      if (c == cell_symbol_call_with_current_continuation)
-        {
-          R1 = R1->cdr;
-          goto call_with_current_continuation;
-        }
-      if (c == cell_symbol_call_with_values)
-        {
-          R1 = R1->cdr;
-          goto call_with_values;
-        }
-      if (c == cell_symbol_current_environment)
-        {
-          R1 = R0;
-          goto vm_return;
-        }
-    }
-  else if (t == TPAIR)
-    {
-      if (R1->car->car == cell_symbol_lambda)
-        {
-          formals = R1->car->cdr->car;
-          args = R1->cdr;
-          body = R1->car->cdr->cdr;
-          p = pairlis (formals, R1->cdr, R0);
-          check_formals (R1, formals, args);
-          call_lambda (body, p, p);
-          goto begin;
-        }
-    }
-  push_cc (R1->car, R1, R0, cell_vm_apply2);
-  goto eval;
-apply2:
-  check_apply (R1, R2->car);
-  R1 = cons (R1, R2->cdr);
+  /* Get this thing rolling! */
   goto apply;
 
-eval:
-  t = R1->type;
-  if (t == TPAIR)
+  while (1)
     {
-      c = R1->car;
+      inst = code [pc];
+      pc += 1;
 
-      /* If the car is a bound identifier, we want to dispatch on the
-         value to which it is bound. */
-      if (c->type == TBINDING)
+      switch (inst)
         {
-          if (c->lexical_p != 0)
-            R1->car = c->binding->cdr;
-          else
-            R1->car = variable_ref (c->binding->cdr);
+        case OP_GC:
+          stack_push (mark);      /* Preserve from garbage collection */
+          stack_push (proc);      /* Preserve from garbage collection */
+          gc ();
+          proc = stack_pop ();
+          mark = stack_pop ();
+          code = cell_bytes (template_code (proc->template));
+          literals = cell_nil;    /* Invalidate cache */
+          stack_push (cell_unspecified);
+          break;
+        case OP_REF_MARK:
+          stack_push (mark);
+          break;
+        case OP_SET_MARK:
+          mark = stack_pop ();
+          stack_push (cell_unspecified);
+          break;
+        case OP_UNSPECIFIED:
+          stack_push (cell_unspecified);
+          break;
+        case OP_NIL:
+          stack_push (cell_nil);
+          break;
+        case OP_FALSE:
+          stack_push (cell_f);
+          break;
+        case OP_TRUE:
+          stack_push (cell_t);
+          break;
+        case OP_LITERAL:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            unsigned short literal_id = *t;
+            pc += 2;
+            if (literals == cell_nil)   /* If not set, cache it for later */
+              literals = template_literals (proc->template);
+            stack_push (vector_ref_ (literals, literal_id));
+            break;
+          }
+        case OP_DROP:
+          stack_pop ();
+          break;
 
-          if (R1->car == cell_undefined)
-            return error (cell_symbol_unbound_variable, c->binding->car);
-        }
+        case OP_BRANCH:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            unsigned short target = *t;
+            pc += 2;
+            if (stack_pop () == cell_f)
+              pc = target;
+            break;
+          }
+        case OP_JUMP:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            unsigned short target = *t;
+            pc += 2;
+            pc = target;
+            break;
+          }
 
-      c = R1->car;
-      if (c == cell_symbol_quote)
-        {
-          R1 = R1->cdr->car;
-          goto vm_return;
-        }
-      else if (c == cell_symbol_begin)
-        goto begin;
-      else if (c == cell_symbol_lambda)
-        {
-          R1 = make_closure_ (R1->cdr->car, R1->cdr->cdr, R0);
-          goto vm_return;
-        }
-      else if (c == cell_symbol_if)
-        {
-          R1 = R1->cdr;
-          goto vm_if;
-        }
-      else if (c == cell_symbol_set_x)
-        {
-          push_cc (R1->cdr->cdr->car, R1, R0, cell_vm_eval_set_x);
-          goto eval;
-        eval_set_x:
-          R1 = set_x (R2->cdr->car, R1, 0);
-          goto vm_return;
-        }
-      else if (c == cell_vm_macro_expand)
-        {
-          push_cc (R1->cdr->car, R1, R0, cell_vm_eval_macro_expand_eval);
-          goto eval;
-        eval_macro_expand_eval:
-          push_cc (R1, R2, R0, cell_vm_eval_macro_expand_expand);
-          goto macro_expand;
-        eval_macro_expand_expand:
-          goto vm_return;
-        }
-      else
-        {
-          if (R1->type == TPAIR)
-            if (R1->car == cell_symbol_define || R1->car == cell_symbol_define_macro)
+        case OP_REF_LOCAL:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            unsigned short target = *t;
+            pc += 2;
+            stack_push (stack_index (fp + 1 + target));
+            break;
+          }
+        case OP_REF_CLOSURE:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            unsigned short target = *t;
+            pc += 2;
+            stack_push (vector_ref_ (proc->env, target));
+            break;
+          }
+        case OP_RESOLVE:
+          {
+            struct scm *target = stack_pop ();
+
+            if (target->type != TBINDING)
+              assert_msg (0, "eval_compiled: OP_RESOLVE: expected binding.");
+            if (target->binding->type != TVARIABLE)
+              assert_msg (0, "eval_compiled: expected variable in binding");
+
+            stack_push (target->binding->variable);
+
+            if (stack_peek () == cell_undefined)
+              error (cell_symbol_unbound_variable, cons (target->name, proc));
+            break;
+          }
+        case OP_SET:
+          {
+            struct scm *target = stack_pop ();
+
+            if (target->type != TBINDING)
+              assert_msg (0, "eval_compiled: OP_SET: expected binding");
+            if (target->binding->type != TVARIABLE)
+              assert_msg (0, "eval_compiled: expected variable in binding");
+
+            target->binding->variable = stack_pop ();
+            stack_push (cell_unspecified);
+            break;
+          }
+          break;
+
+        case OP_CLOSURE:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            argno = *t;
+            pc += 2;
+            struct scm *template;
+            struct scm *captures = make_vector_ (argno, cell_nil);
+            for (; argno > 0; argno -= 1)
+              vector_set_x_ (captures, argno - 1, stack_pop ());
+            template = stack_pop ();
+            stack_push (make_closure (captures, template));
+            break;
+          }
+
+        throw:
+          {
+            struct scm *throw =
+              module_variable (initial_module (), cell_symbol_throw);
+            if (throw == cell_f)    /* Throw not defined yet, just die */
               {
-                global_p = 0;
-                if (R0->car->car != cell_closure)
-                  global_p = 1;
-                macro_p = 0;
-                if (R1->car == cell_symbol_define_macro)
-                  macro_p = 1;
-                if (global_p != 0)
-                  {
-                    name = R1->cdr->car;
-                    aa = R1->cdr->car;
-                    if (aa->type == TPAIR)
-                      name = name->car;
-                    if (macro_p != 0)
-                      {
-                        entry = macro_get_handle (name);
-                        if (entry == cell_f)
-                          macro_set_x (name, cell_f);
-                      }
-                    else
-                      /* Ensure this name is bound in the current
-                         module. */
-                      lookup_binding (name, cell_t);
-                  }
-                R2 = R1;
-                aa = R1->cdr->car;
-                if (aa->type != TPAIR)
-                  {
-                    push_cc (R1->cdr->cdr->car, R2, cons (cons (R1->cdr->car, R1->cdr->car), R0), cell_vm_eval_define);
-                    goto eval;
-                  }
-                else
-                  {
-                    formals = R1->cdr->car->cdr;
-                    body = R1->cdr->cdr;
-
-                    if (macro_p != 0 || global_p != 0)
-                      expand_variable (body, formals);
-
-                    /* The GC may have moved 'formals' and 'body' during
-                       variable expansion, so get fresh pointers. */
-                    formals = R1->cdr->car->cdr;
-                    body = R1->cdr->cdr;
-                    p = pairlis (R1->cdr->car, R1->cdr->car, R0);
-
-                    R1 = cons (cell_symbol_lambda, cons (formals, body));
-                    push_cc (R1, R2, p, cell_vm_eval_define);
-                    goto eval;
-                  }
-              eval_define:
-                /* These may have been clobbered by an inline define
-                   during evaluation, so they must be recomputed. */
-                global_p = 0;
-                if (R0->car->car != cell_closure)
-                  global_p = 1;
-                macro_p = 0;
-                if (R2->car == cell_symbol_define_macro)
-                  macro_p = 1;
-
-                name = R2->cdr->car;
-                aa = R2->cdr->car;
-                if (aa->type == TPAIR)
-                  name = name->car;
-                if (macro_p != 0)
-                  {
-                    entry = macro_get_handle (name);
-                    R1 = make_macro (name, R1);
-                    set_cdr_x (entry, R1);
-                  }
-                else if (global_p != 0)
-                  {
-                    set_x (name, R1, 1);
-                  }
-                else
-                  {
-                    entry = cons (name, R1);
-                    aa = cons (entry, cell_nil);
-                    /* Push the definition onto the current lexical
-                       environment, but keep the first element (named
-                       '*closure*') pointing to the rest of the
-                       environment. */
-                    set_cdr_x (aa, cdr (R0));
-                    set_cdr_x (R0, aa);
-                    set_cdr_x (car (R0), aa);
-                  }
-                R1 = cell_unspecified;
-                goto vm_return;
+                display_error_ (stack_pop ());
+                eputs ("\n");
+                exit (1);
               }
-          push_cc (R1->car, R1, R0, cell_vm_eval_check_func);
-          gc_check ();
-          goto eval;
-        eval_check_func:
-          push_cc (R2->cdr, R2, R0, cell_vm_eval2);
-          goto evlis;
-        eval2:
-          R1 = cons (R2->car, R1);
-          goto apply;
-        }
-    }
-  else if (t == TSYMBOL)
-    {
-      if (R1 == cell_symbol_current_environment)
-        goto vm_return;
-      if (R1 == cell_symbol_begin)
-        goto vm_return;
-      if (R1 == cell_symbol_call_with_current_continuation)
-        goto vm_return;
-      R1 = assert_defined (R1, lookup_value (R1));
-      goto vm_return;
-    }
-  else if (t == TBINDING)
-    {
-      name = R1->binding->car;
+            else
+              stack_push (throw->variable);
+            /* fallthrough */
+          }
 
-      if (R1->lexical_p != 0)
-        R1 = R1->binding->cdr;
-      else
-        R1 = variable_ref (R1->binding->cdr);
+        case OP_APPLY:
+        case OP_TAIL_APPLY:
+          {
+          apply:
+            fn = stack_pop ();
+            if (fn->type == TBUILTIN)
+              if (builtin_arity_ (fn) == -1)
+                /* Optimization: the args are ready in the stack in a list,
+                 * don't unpack to pack them later
+                 */
+                goto builtin_1;
+            struct scm *args = stack_pop ();
+            struct scm *cur = cell_nil;
+            argno = 0;
+            for (cur = args; cur != cell_nil; cur = cur->cdr)
+              {
+                stack_push (cur->car);
+                argno++;
+              }
 
-      if (R1 == cell_undefined)
-        return error (cell_symbol_unbound_variable, name);
-
-      goto vm_return;
-    }
-  else if (t == TBROKEN_HEART)
-    error (cell_symbol_system_error, R1);
-  else
-    goto vm_return;
-
-macro_expand:
-  if (R1->type != TPAIR || R1->car == cell_symbol_quote)
-    goto vm_return;
-
-  if (R1->car == cell_symbol_lambda)
-    {
-      push_cc (R1->cdr->cdr, R1, R0, cell_vm_macro_expand_lambda);
-      goto macro_expand;
-    macro_expand_lambda:
-      R2->cdr->cdr = R1;
-      R1 = R2;
-      goto vm_return;
-    }
-
-  if (R1->car == cell_symbol_define || R1->car == cell_symbol_define_macro)
-    {
-      push_cc (R1->cdr->cdr, R1, R0, cell_vm_macro_expand_define);
-      goto macro_expand;
-    macro_expand_define:
-      R2->cdr->cdr = R1;
-      R1 = R2;
-      if (R1->car == cell_symbol_define_macro)
-        {
-          push_cc (R1, R1, R0, cell_vm_macro_expand_define_macro);
-          goto eval;
-        macro_expand_define_macro:
-          R1 = R2;
-        }
-      goto vm_return;
-    }
-
-  if (R1->car == cell_symbol_set_x)
-    {
-      push_cc (R1->cdr->cdr, R1, R0, cell_vm_macro_expand_set_x);
-      goto macro_expand;
-    macro_expand_set_x:
-      R2->cdr->cdr = R1;
-      R1 = R2;
-      goto vm_return;
-    }
-
-  macro = get_macro (R1->car);
-  if (macro != cell_f)
-    {
-      R1 = cons (macro, R1->cdr);
-      push_cc (R1, cell_nil, R0, cell_vm_macro_expand);
-      goto apply;
-    }
-  a = R1->car;
-  if (a->type == TSYMBOL && a != cell_symbol_begin)
-    {
-      macro = macro_get_handle (cell_symbol_portable_macro_expand);
-      if (macro != cell_f)
-        {
-          expanders = lookup_value (cell_symbol_sc_expander_alist);
-          if (expanders != cell_undefined)
-            {
-              macro = assq (R1->car, expanders);
-              if (macro != cell_f)
+            if (inst == OP_TAIL_APPLY)
+              inst = OP_TAIL_CALL;
+            goto call;
+          }
+        case OP_CALL:
+        case OP_TAIL_CALL:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            argno = *t;
+            pc += 2;
+            fn = stack_pop ();
+          call:
+            switch (fn->type)
+              {
+              case TCLOSURE:
                 {
-                  sc_expand = lookup_value (cell_symbol_macro_expand);
-                  R2 = R1;
-                  if (sc_expand != cell_undefined && sc_expand != cell_f)
+                  int arity = template_arity (fn->template)->value;
+
+                  if ((arity >= 0 && argno != arity) ||
+                      (arity < 0 && (argno + arity < -1)))
+                    error (cell_symbol_wrong_number_of_args,
+                           cons (make_number (argno),
+                                 template_name (fn->template)));
+
+                  if (arity < 0)
                     {
-                      R1 = cons (sc_expand, cons (R1, cell_nil));
-                      goto apply;
+                      /* Extract the _rest_:
+                       * They are reversed in the stack, so we cons them in
+                       * the correct order and push them back to the stack.
+                       */
+                      arity = -arity;
+                      struct scm *rest_args = cell_nil;
+
+                      for (; argno >= arity; argno--)
+                        rest_args = cons (stack_pop (), rest_args);
+                      stack_push (rest_args);
                     }
+
+                  /* At this point the stack looks like this:
+                   *
+                   * FRAME_i ... ARG_0 ... ARG_n
+                   *             ^-------------^ ^
+                   *             Args            g_stack
+                   */
+                  size_t args_loc = g_stack - arity;
+                  size_t frame_loc = g_stack;
+                  stack_push (cell_unspecified);  /* Make space for the frame header */
+
+                  /* Add locals to environment */
+                  struct scm *l = template_locals (fn->template);
+                  long j, local_count = l->length;
+                  for (j = 0; j < local_count; j++)
+                    {
+                      struct scm *name = vector_ref_ (l, j);
+                      struct scm *target = cell_undefined;
+                      if (j < arity)
+                        target = stack_index (args_loc + j);
+                      stack_push (make_binding (name, make_variable (target)));
+                    }
+
+                  /* At this point the stack looks like this:
+                   *
+                   * FRAME_i ... ARG_0 ... ARG_n *unspecified* BIND_0 ... BIND_n ... BIND_m
+                   * ^           ^-------------^               ^---------------^^---------^ ^
+                   *             Args                          Locals: (args)    (rest)     g_stack
+                   */
+
+                  /* Put the frame header */
+                  struct scm *frame_header = stack_index (fp);   /* TCO: Reuse the frame */
+                  size_t current_fp = fp;
+                  if (inst != OP_TAIL_CALL)
+                    {
+                      struct scm *to = proc;
+                      if (mark != cell_nil)
+                        to = cons (mark, proc);
+                      frame_header = make_frame (to, pc, fp);
+                      current_fp = args_loc;
+                      mark = cell_nil;
+                    }
+                  stack_set (frame_loc, frame_header);
+
+                  /* At this point the stack looks like this:
+                   *
+                   * FRAME_i ... ARG_0 ... ARG_n FRAME_i+1 BIND_0 ... BIND_n ... BIND_m
+                   * ^           ^-------------^           ^---------------^^---------^ ^
+                   *             Args                      Locals: (args)    (rest)     g_stack
+                   * In the TCO case:
+                   *
+                   * FRAME_i ... ARG_0 ... ARG_n FRAME_i BIND_0 ... BIND_n ... BIND_m
+                   * ^           ^-------------^ ^       ^---------------^^---------^ ^
+                   * |           Args            |       Locals: (args)    (rest)     g_stack
+                   * +-- Same -------------------+
+                   */
+
+                  size_t len = g_stack - frame_loc;
+                  for (j = 0; j < len; j++)
+                    stack_set (current_fp + j, stack_index (frame_loc + j));
+                  g_stack -= frame_loc - current_fp;
+
+                  /* At this point the stack looks like this:
+                   *
+                   * FRAME_i ... FRAME_i+1 BIND_0 ... BIND_n ... BIND_m
+                   * ^           ^         ^---------------^^---------^ ^
+                   *             fp        Locals: (args)    (rest)     g_stack
+                   *
+                   * In the TCO case:
+                   *
+                   * FRAME_i BIND_0 ... BIND_n ... BIND_m
+                   * ^       ^---------------^^---------^ ^
+                   * fp      Locals: (args)    (rest)     g_stack
+                   */
+
+                  /* Try to garbage collect.
+                   * This is the only place we run the GC.
+                   */
+                  stack_push (mark);     /* Preserve from garbage collection */
+                  stack_push (fn);       /* Preserve from garbage collection */
+                  gc_check ();
+                  fn = stack_pop ();
+                  mark = stack_pop ();
+
+                  proc = fn;
+                  fp = current_fp;
+                  pc = 0;
+                  code = cell_bytes (template_code (proc->template));
+                  literals = cell_nil;    /* Invalidate cache */
+                  break;
                 }
-            }
+
+              case TBUILTIN:
+                switch (builtin_arity_ (fn))
+                  {
+                  case 0:
+                    {
+                      if (0 != argno)
+                        error (cell_symbol_wrong_number_of_args,
+                               cons (make_number (argno), builtin_name (fn)));
+                      function0_t fp = (function0_t) builtin_function (fn);
+                      stack_push (fp ());
+                      break;
+                    }
+                  case 1:
+                    {
+                      struct scm *a1;
+                      if (1 != argno)
+                        error (cell_symbol_wrong_number_of_args,
+                               cons (make_number (argno), builtin_name (fn)));
+builtin_1:
+                      a1 = stack_pop ();
+                      function1_t fp = (function1_t) builtin_function (fn);
+                      stack_push (fp (a1));
+                      break;
+                    }
+                  case 2:
+                    {
+                      struct scm *a2, *b2;
+                      if (2 != argno)
+                        error (cell_symbol_wrong_number_of_args,
+                               cons (make_number (argno), builtin_name (fn)));
+                      function2_t fp = (function2_t) builtin_function (fn);
+                      b2 = stack_pop ();
+                      a2 = stack_pop ();
+                      stack_push (fp (a2, b2));
+                      break;
+                    }
+                  case 3:
+                    {
+                      struct scm *a3, *b3, *c3;
+                      if (3 != argno)
+                        error (cell_symbol_wrong_number_of_args,
+                               cons (make_number (argno), builtin_name (fn)));
+                      function3_t fp = (function3_t) builtin_function (fn);
+                      c3 = stack_pop ();
+                      b3 = stack_pop ();
+                      a3 = stack_pop ();
+                      stack_push (fp (a3, b3, c3));
+                      break;
+                    }
+                  case -1:
+                    {
+                      /* Arguments are in the stack one by one */
+                      struct scm *cur;
+                      for (cur = cell_nil; argno != 0; argno--)
+                        cur = cons (stack_pop (), cur);
+                      stack_push (cur);
+                      goto builtin_1;
+                    }
+                  default:
+                    assert_msg (0, "builtin: unreachable arity");
+                    break;
+                  }
+                break;
+
+              case TCONTINUATION:
+                {
+                  /* Only uses the first argument, discards the rest */
+                  struct scm *arg = stack_pop ();
+
+                  stack_from_scm (fn->stack);
+
+                  proc = fn->state->closure;
+                  if (proc->type == TPAIR)
+                    {
+                      mark = proc->car;
+                      proc = proc->cdr;
+                    }
+                  fp = fn->state->frame.fp;
+                  pc = fn->state->frame.pc;
+                  code = cell_bytes (template_code (proc->template));
+                  literals = cell_nil;    /* Invalidate cache */
+
+                  stack_push (arg);
+                  break;
+                }
+              default:
+                assert_msg (0, "OP_[TAIL_]CALL: Wrong type to apply.");
+                break;
+              }
+            break;
+          }
+        case OP_RETURN:
+          {
+            /* At this point the stack looks like this:
+             *
+             * FRAME_i ... FRAME_i+1 BIND_0 ... BIND_n ... BIND_m RESULT
+             * ^           ^         ^---------------^^---------^        ^
+             *             fp        Locals: (args)    (rest)            g_stack
+             */
+            struct scm *res   = stack_peek ();
+            struct scm *frame = stack_index (fp);
+            stack_rewind_to (fp);
+
+            struct scm *fn = frame->closure;
+
+            /* We have marks */
+            if (fn->type == TPAIR)
+              {
+                mark = fn->car;
+                fn = fn->cdr;
+              }
+            else
+              mark = cell_nil;
+
+            /* We came from a C `apply` */
+            if (fn == cell_nil)
+              return res;
+
+            stack_push (res);
+
+            proc = fn;
+            fp = frame->frame.fp;
+            pc = frame->frame.pc;
+            code = cell_bytes (template_code (proc->template));
+            literals = cell_nil;        /* Invalidate cache */
+            break;
+          }
+        case OP_CC:
+          {
+            pc += pc & 1;       /* Align to half size */
+            unsigned short *t = (unsigned short *)(code + pc);
+            unsigned short target = *t;
+            pc += 2;
+            struct scm *to = proc;
+            if (mark != cell_nil)
+              to = cons (mark, proc);
+            struct scm *cont = make_continuation (to, fp, target);
+            stack_push (cont);
+            break;
+          }
+        case OP_UNREACHABLE:
+          assert_msg (0, "eval_compiled: unreachable code");
+          break;
+        default:
+          assert_msg (0, "eval_compiled: unknown instruction");
+          break;
         }
     }
-
-  push_cc (R1->car, R1, R0, cell_vm_macro_expand_car);
-  goto macro_expand;
-
-macro_expand_car:
-  R2->car = R1;
-  R1 = R2;
-  if (R1->cdr == cell_nil)
-    goto vm_return;
-
-  push_cc (R1->cdr, R1, R0, cell_vm_macro_expand_cdr);
-  goto macro_expand;
-
-macro_expand_cdr:
-  R2->cdr = R1;
-  R1 = R2;
-
-  goto vm_return;
-
-begin:
-  x = cell_unspecified;
-  while (R1 != cell_nil)
-    {
-      gc_check ();
-      if (R1->type == TPAIR)
-        {
-          a = R1->car;
-          if (a->type == TPAIR)
-            {
-              if (a->car == cell_symbol_begin)
-                R1 = append2 (a->cdr, R1->cdr);
-            }
-        }
-      if (R1->cdr == cell_nil)
-        {
-          R1 = R1->car;
-          goto eval;
-        }
-      push_cc (R1->car, R1, R0, cell_vm_begin_eval);
-      goto eval;
-    begin_eval:
-      x = R1;
-      R1 = R2->cdr;
-    }
-  R1 = x;
-  goto vm_return;
-
-
-begin_expand:
-  x = cell_unspecified;
-  while (R1 != cell_nil)
-    {
-    begin_expand_while:
-      gc_check ();
-
-      if (R1->type == TPAIR)
-        {
-          a = R1->car;
-          if (a->type == TPAIR)
-            if (R1->car->car == cell_symbol_begin)
-              R1 = append2 (R1->car->cdr, R1->cdr);
-        }
-
-      push_cc (R1->car, R1, R0, cell_vm_begin_expand_macro);
-      goto macro_expand;
-    begin_expand_macro:
-      if (R1 != R2->car)
-        {
-          R2->car = R1;
-          R1 = R2;
-          goto begin_expand_while;
-          continue; /* FIXME: M2-PLanet */
-        }
-      R1 = R2;
-
-      /* If we expand a 'define' form that refers to itself, and it also
-         reuses a name higher up in the module chain, the self-reference
-         will be bound to the variable from the other module.  We hack
-         around this by binding the name in the current module before
-         expansion.  */
-      if (R1->type == TPAIR
-          && R1->car->type == TPAIR
-          && R1->car->car == cell_symbol_define)
-        {
-          /* Split the '&&' expression up to prevent a segfault when
-             compiled with M2-Planet. */
-          if (R1->car->cdr->type == TPAIR
-              && R1->car->cdr->car->type == TPAIR)
-            lookup_binding (R1->car->cdr->car->car, cell_t);
-        }
-
-
-      expand_variable (R1->car, cell_nil);
-      push_cc (R1->car, R1, R0, cell_vm_begin_expand_eval);
-      goto eval;
-    begin_expand_eval:
-      x = R1;
-      R1 = R2->cdr;
-    }
-  R1 = x;
-  goto vm_return;
-
-vm_if:
-  push_cc (R1->car, R1, R0, cell_vm_if_expr);
-  goto eval;
-if_expr:
-  x = R1;
-  R1 = R2;
-  if (x != cell_f)
-    {
-      R1 = R1->cdr->car;
-      goto eval;
-    }
-  if (R1->cdr->cdr != cell_nil)
-    {
-      R1 = R1->cdr->cdr->car;
-      goto eval;
-    }
-  R1 = cell_unspecified;
-  goto vm_return;
-
-call_with_current_continuation:
-  x = make_continuation (g_continuations);
-  g_continuations = g_continuations + 1;
-  v = make_vector_ (STACK_SIZE - g_stack, cell_unspecified);
-  for (i = g_stack; i < STACK_SIZE; i = i + 1)
-    vector_set_x_ (v, i - g_stack, g_stack_array[i]);
-  x->continuation = v;
-  push_cc (cons (R1->car, cons (x, cell_nil)), x, R0, cell_vm_call_with_current_continuation2);
-  goto apply;
-call_with_current_continuation2:
-  v = make_vector_ (STACK_SIZE - g_stack, cell_unspecified);
-  for (i = g_stack; i < STACK_SIZE; i = i + 1)
-    vector_set_x_ (v, i - g_stack, g_stack_array[i]);
-  R2->continuation = v;
-  goto vm_return;
-
-call_with_values:
-  push_cc (cons (R1->car, cell_nil), R1, R0, cell_vm_call_with_values2);
-  goto apply;
-call_with_values2:
-  if (R1->type == TVALUES)
-    R1 = R1->cdr;
-  else
-    R1 = cons (R1, cell_nil);
-  R1 = cons (R2->cdr->car, R1);
-  goto apply;
-
-vm_return:
-  x = R1;
-  gc_pop_frame ();
-  R1 = x;
-  goto eval_apply;
-}
-
-struct scm *
-apply (struct scm *f, struct scm *x, struct scm *a)     /*:((internal)) */
-{
-  push_cc (cons (f, x), cell_unspecified, a, cell_unspecified);
-  R3 = cell_vm_apply;
-  return eval_apply ();
-}
-
-struct scm *
-primitive_load (struct scm *filename)     /*:((arity . 1))*/
-{
-  struct scm *input;
-
-  if ((filename->type == TNUMBER) && filename->value == 0)
-    input = current_input_port ();
-  else if (filename->type == TSTRING)
-    input = set_current_input_port (open_input_file (filename));
-  else if (filename->type == TPORT)
-    input = set_current_input_port (filename);
-  else
-    {
-      eputs ("primitive_load failed, filename=");
-      display_error_ (filename);
-      assert_msg (0, "primitive-load-boom 0");
-    }
-
-  struct scm *forms = read_input_file_env (cell_nil);
-  forms = cons (cell_symbol_begin, forms);
-  set_current_input_port (input);
-
-  struct scm *env = cell_nil;
-  env = cons (cons (cell_symbol_program, forms), env);
-
-  gc_push_frame ();
-  /* Store 'input' in R2 so it does not get GCed during evaluation. */
-  push_cc (forms, cell_unspecified, env, cell_unspecified);
-  R3 = cell_vm_begin_expand;
-  struct scm *result = eval_apply ();
-  input = R2;
-  gc_pop_frame ();
-
-  return result;
 }

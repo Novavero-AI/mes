@@ -5,7 +5,7 @@
 # ***REMOVE THIS BLOCK COMMENT INITIALLY***
 
 # GNU Mes --- Maxwell Equations of Software
-# Copyright © 2016, 2017,2018 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2016,2017,2018,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
 #
 # This file is part of GNU Mes.
 #
@@ -79,6 +79,10 @@ burp
             #! boo !#
             ;;(bb 4)
             )
-          ))
+               ))
+(begin #;(foo
+      (bar))
+  (display "baz\n"))
+(display (list 0 1 2 #;3))
 (newline)
 ;; TODO: syntax, unsyntax, unsyntax-splicing

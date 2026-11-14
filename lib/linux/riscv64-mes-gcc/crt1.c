@@ -55,13 +55,13 @@ _start ()
        "slli  t0, t0, 3\n\t"
        "add   t0, t1, t0\n\t"
 
-       "lw    %[a0], 0(s0)\n\t"  // a0 argc
-       "addi  %[a1], s0, 8\n\t"  // a1 argv
-       "mv    %[a2], t0\n\t"     // a2 envp
-       : [a0] "=r" (argc), [a1] "=r" (argv), [a2] "=r" (envp)
-       : "r" (environ)
+       "lw    %[argc], 0(s0)\n\t"
+       "addi  %[argv], s0, 8\n\t"
+       "mv    %[envp], t0\n\t"
+       : [argc] "=r" (argc), [argv] "=r" (argv), [envp] "=r" (envp)
+       :
       );
-  __init_io ();
+  __init_io (argc, argv, envp);
   retval = main (argc, argv, envp);
   asm (
        "mv    a0, %1\n\t"

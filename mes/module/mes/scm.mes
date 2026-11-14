@@ -2,7 +2,7 @@
 
 ;;; GNU Mes --- Maxwell Equations of Software
 ;;; Copyright © 2016,2017,2018,2019,2022 Janneke Nieuwenhuizen <janneke@gnu.org>
-;;; Copyright © 2023 Ekaitz Zarraga <ekaitz@elenq.tech>
+;;; Copyright © 2023,2025 Ekaitz Zarraga <ekaitz@elenq.tech>
 ;;; Copyright © 2022,2023 Timothy Sample <samplet@ngyro.com>
 ;;;
 ;;; This file is part of GNU Mes.
@@ -88,9 +88,9 @@
 (define integer? number?)
 
 (define (read . port)
-  (if (null? port) (read-env (current-environment))
+  (if (null? port) (reader-read)
       (let* ((prev (set-current-input-port (car port)))
-             (result (read-env (current-environment))))
+             (result (reader-read)))
         result)))
 
 (if (not (defined? 'peek-char))
@@ -246,7 +246,10 @@
 (define (vector . rest) (list->vector rest))
 
 (define (vector-copy x)
-  (list->vector (vector->list x)))
+  (let* ((l (vector-length x))
+         (o (make-vector l)))
+    (vector-copy! o 0 x 0 l)
+    o))
 
 
 ;;; Bytevectors
@@ -259,14 +262,11 @@
 
 
 ;;; Strings/srfi-13
-(define (make-string n . fill)
-  (list->string (apply make-list n fill)))
-
 (define (substring s start . rest)
   (let* ((end (if (pair? rest) (car rest) (string-length s)))
-         (lst (list-tail (string->list s) start)))
-    (list->string (if (not end) lst
-                      (list-head lst (- end start))))))
+         (res (make-string (- end start))))
+    (string-copy! res 0 s start end)
+    res))
 
 (define (string-prefix? prefix string . rest)
   (let* ((start (if (pair? rest) (car rest) 0))
@@ -568,7 +568,6 @@
                   (proc (lambda (val)
                           (apply-continuation cont val)))))))
 
-  (hashq-set! (initial-module) 'dynamic-wind (make-variable dynamic-wind))
-  (hashq-set! (initial-module) 'call-with-current-continuation
-              (make-variable call/cc))
-  (hashq-set! (initial-module) 'call/cc (make-variable call/cc)))
+  (module-define! (initial-module) 'dynamic-wind dynamic-wind)
+  (module-define! (initial-module) 'call-with-current-continuation call/cc)
+  (module-define! (initial-module) 'call/cc call/cc))

@@ -28,7 +28,6 @@ compile () {
     objects="$objects $o"
     if test ! -e $o -o $c -nt $o; then
         trace "CC         $c" $CC -c $AM_CPPFLAGS $CPPFLAGS $AM_CFLAGS $CFLAGS -o $o $c
-        $CC -c $AM_CPPFLAGS $CPPFLAGS $AM_CFLAGS $CFLAGS -o $o $c
     fi
 }
 

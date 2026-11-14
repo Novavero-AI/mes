@@ -186,6 +186,7 @@ lib/string/strcmp.c
 lib/string/strcpy.c
 lib/string/strncmp.c
 lib/posix/raise.c
+lib/$mes_cpu-mes-$compiler/setjmp.c
 "
 
 if test $mes_kernel = gnu; then
@@ -394,6 +395,7 @@ lib/string/strerror.c
 lib/string/strlwr.c
 lib/string/strncasecmp.c
 lib/string/strncpy.c
+lib/string/strpbrk.c
 lib/string/strrchr.c
 lib/string/strstr.c
 lib/string/strupr.c
@@ -404,7 +406,6 @@ lib/stub/localtime.c
 lib/stub/putenv.c
 lib/stub/realpath.c
 lib/stub/sigemptyset.c
-lib/$mes_cpu-mes-$compiler/setjmp.c
 "
 
 # ldexpl is in this list and not in libc_tcc_SOURCES, where the branch it
@@ -465,7 +466,6 @@ lib/string/rindex.c
 lib/string/strcspn.c
 lib/string/strdup.c
 lib/string/strncat.c
-lib/string/strpbrk.c
 lib/string/strspn.c
 lib/stub/__cleanup.c
 lib/stub/atan2.c
@@ -555,7 +555,6 @@ fi
 
 mes_SOURCES="
 src/builtins.c
-src/cc.c
 src/core.c
 src/display.c
 src/eval-apply.c
@@ -568,10 +567,10 @@ src/mes.c
 src/module.c
 src/posix.c
 src/reader.c
-src/stack.c
 src/string.c
 src/struct.c
 src/symbol.c
 src/variable.c
+src/compiler.c
 src/vector.c
 "

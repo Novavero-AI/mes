@@ -32,10 +32,8 @@
         (cons <cell:closure> (quote <cell:closure>))
         (cons <cell:continuation> (quote <cell:continuation>))
         (cons <cell:keyword> (quote <cell:keyword>))
-        (cons <cell:macro> (quote <cell:macro>))
         (cons <cell:number> (quote <cell:number>))
         (cons <cell:pair> (quote <cell:pair>))
-        (cons <cell:ref> (quote <cell:ref>))
         (cons <cell:special> (quote <cell:special>))
         (cons <cell:string> (quote <cell:string>))
         (cons <cell:struct> (quote <cell:struct>))
@@ -68,9 +66,6 @@
 (define (keyword? x)
   (eq? (core:type x) <cell:keyword>))
 
-(define (macro? x)
-  (eq? (core:type x) <cell:macro>))
-
 (define (number? x)
   (eq? (core:type x) <cell:number>))
 
@@ -81,10 +76,7 @@
   (eq? (if #f #f) x))
 
 (define (procedure? p)
-  (and (or (builtin? p)
-           (and (pair? p) (eq? (car p) 'lambda))
-           (closure? p))
-       #t))
+  (or (builtin? p) (closure? p)))
 
 (define (special? x)
   (eq? (core:type x) <cell:special>))

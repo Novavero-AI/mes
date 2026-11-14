@@ -1,6 +1,6 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
- * Copyright © 2019 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2019, 2025 Janneke Nieuwenhuizen <janneke@gnu.org>
  *
  * This file is part of GNU Mes.
  *
@@ -46,6 +46,12 @@ cast_int_to_long (int i)
 
 long
 cast_voidp_to_long (void const *i)
+{
+  return i;
+}
+
+long *
+cast_voidp_to_longp (void const *i)
 {
   return i;
 }

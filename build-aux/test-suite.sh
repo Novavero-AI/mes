@@ -3,6 +3,7 @@
 # GNU Mes --- Maxwell Equations of Software
 # Copyright © 2011-2018 Free Software Foundation, Inc.
 # Copyright © 2019 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2025 Stefan <stefan-guix@vodafonemail.de>
 #
 # This file is part of GNU Mes.
 #
@@ -51,7 +52,7 @@ for t in $TESTS; do
        --color-tests $colors\
        --enable-hard-errors no\
        --expect-failure $fail\
-       -- $log_compiler\
+       --- $log_compiler\
        ${srcdest}$t
 done
 

@@ -2,6 +2,7 @@
 
 # GNU Mes --- Maxwell Equations of Software
 # Copyright © 2018,2019,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2025 Stefan <stefan-guix@vodafonemail.de>
 #
 # This file is part of GNU Mes.
 #
@@ -29,10 +30,10 @@ b=$(basename "$t" .scm)
 
 if [ "$(basename $MES)" = guile ]; then
     $MES -L ${srcdest}module -C module -L . -c '(begin (use-modules (mes guile)) (include-from-path "'"$t"'"))'
-elif [ -z "${b/5[0-9]-*/}" ]; then
+elif [ ${b%${b#?}} = 5 ]; then
     cat "$t" | MES_BOOT=boot-00.scm $MES
-elif [ -z "${b/6[0-9]-*/}" ]; then
+elif [ ${b%${b#?}} = 6 ]; then
     cat "$t" | MES_BOOT=boot-01.scm $MES
 else
-    MES_BOOT=$t $MES;
+    cat "$t" | MES_BOOT=boot-00.scm $MES
 fi

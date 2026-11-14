@@ -63,7 +63,6 @@ gcc -g -D HAVE_CONFIG_H=1                       \
     lib/mes/assert_msg.c                        \
                                                 \
     src/builtins.c                              \
-    src/cc.c                                    \
     src/core.c                                  \
     src/display.c                               \
     src/eval-apply.c                            \
@@ -76,11 +75,11 @@ gcc -g -D HAVE_CONFIG_H=1                       \
     src/module.c                                \
     src/posix.c                                 \
     src/reader.c                                \
-    src/stack.c                                 \
     src/string.c                                \
     src/struct.c                                \
     src/symbol.c                                \
     src/variable.c                              \
+    src/compiler.c                              \
     src/vector.c
 
 ## Check ##
@@ -95,7 +94,7 @@ echo '(display "hello\n")' | MES_BOOT=boot-01.scm out-system-libc/mes
 MES_DEBUG=4 MES=out-system-libc/mes tests/base.test
 
 # GC test
-MES_DEBUG=3 MES_ARENA=20000 MES_MAX_ARENA=20000 MES_BOOT=tests/gc.test out-system-libc/mes
+MES_DEBUG=3 MES_ARENA=40000 MES_BOOT=boot.scm out-system-libc/mes < tests/gc.test
 
 # MesCC test
 # Interesting, but compiling multiple C files is not supported (yet).
@@ -294,7 +293,6 @@ $CC -g -D HAVE_CONFIG_H=1                               \
     lib/linux/$mes_cpu-mes-$compiler/syscall.c          \
                                                         \
     src/builtins.c                                      \
-    src/cc.c                                            \
     src/core.c                                          \
     src/display.c                                       \
     src/eval-apply.c                                    \
@@ -307,11 +305,11 @@ $CC -g -D HAVE_CONFIG_H=1                               \
     src/module.c                                        \
     src/posix.c                                         \
     src/reader.c                                        \
-    src/stack.c                                         \
     src/string.c                                        \
     src/struct.c                                        \
     src/symbol.c                                        \
     src/variable.c                                      \
+    src/compiler.c                                      \
     src/vector.c
 
 ## Check ##
@@ -326,7 +324,7 @@ echo '(display "hello\n")' | MES_BOOT=boot-01.scm out-mes/mes
 MES_DEBUG=4 MES=out-mes/mes tests/base.test
 
 # GC test
-MES_DEBUG=3 MES_ARENA=20000 MES_MAX_ARENA=20000 MES_BOOT=tests/gc.test out-mes/mes
+MES_DEBUG=3 MES_ARENA=40000 MES_BOOT=boot.scm out-mes/mes < tests/gc.test
 
 # MesCC test
 # Interesting, but compiling multiple C files is not supported (yet).

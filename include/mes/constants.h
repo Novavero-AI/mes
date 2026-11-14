@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2016,2017,2018,2019,2022 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -23,37 +24,65 @@
 
 /* Cell types */
 
-#define TCHAR              0
+enum cell_type
+{
+  TCHAR,
+  TBYTES,
+  TCLOSURE,
+  TCONTINUATION,
+  TBUILTIN,
+  TKEYWORD,
+  TNUMBER,
+  TPAIR,
+  TPORT,
+  TSPECIAL,
+  TSTRING,
+  TSTRUCT,
+  TSYMBOL,
+  TVALUES,
+  TBINDING,
+  TVECTOR,
+  TVARIABLE,
+  TFRAME,
+  TBROKEN_HEART,
+};
 
-#define TBYTES             1
-#define TCLOSURE           2
-#define TCONTINUATION      3
-#define TKEYWORD           4
-#define TMACRO             5
-#define TNUMBER            6
-#define TPAIR              7
-#define TPORT              8
-#define TREF               9
-#define TSPECIAL          10
-#define TSTRING           11
-#define TSTRUCT           12
-#define TSYMBOL           13
-#define TVALUES           14
-#define TBINDING          15
-#define TVECTOR           16
-#define TBROKEN_HEART     17
+/* VM opcodes */
+enum opcode
+{
+  /* These 4 could be just an OP_LITERAL */
+  OP_UNSPECIFIED,
+  OP_NIL,
+  OP_FALSE,
+  OP_TRUE,
+
+  OP_LITERAL,
+  OP_DROP,
+  OP_BRANCH,
+  OP_JUMP,
+  OP_SET,
+  OP_REF_LOCAL,
+  OP_REF_CLOSURE,
+  OP_RESOLVE,
+  OP_CLOSURE,
+  OP_GC,
+  OP_CC,
+  OP_CALL,
+  OP_TAIL_CALL,
+  OP_RETURN,
+  OP_APPLY,
+  OP_TAIL_APPLY,
+  OP_REF_MARK,
+  OP_SET_MARK,
+  OP_UNREACHABLE = 0xAA, /* Value is easy to read */
+};
+
+/* Sizes */
+
+#define BUILTINS_SIZE 255
 
 /* Struct types */
-
 #define STRUCT_TYPE 0
 #define STRUCT_PRINTER 1
-
-#define GC_FRAME_SIZE 5
-#define GC_FRAME_PROCEDURE 4
-
-#define MODULE_OBARRAY 3
-#define MODULE_USES 4
-#define MODULE_BINDER 5
-#define MODULE_EVAL_CLOSURE 6
 
 #endif /* __MES_CONSTANTS_H */

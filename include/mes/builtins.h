@@ -2,6 +2,7 @@
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2016,2017,2018,2019,2020,2022,2023 Janneke Nieuwenhuizen <janneke@gnu.org>
  * Copyright © 2022,2023 Timothy Sample <samplet@ngyro.com>
+ * Copyright © 2025 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -23,11 +24,9 @@
 #define __MES_BUILTINS_H
 
 /* src/builtins.c */
-struct scm *make_builtin (struct scm *builtin_type, struct scm *name, struct scm *arity, struct scm *function);
 struct scm *builtin_name (struct scm *builtin);
 struct scm *builtin_arity (struct scm *builtin);
 struct scm *builtin_p (struct scm *x);
-struct scm *builtin_printer (struct scm *builtin);
 /* src/core.c */
 struct scm *car (struct scm *x);
 struct scm *cdr (struct scm *x);
@@ -51,18 +50,11 @@ struct scm *write_ (struct scm *x);
 struct scm *write_error_ (struct scm *x);
 struct scm *write_port_ (struct scm *x, struct scm *p);
 /* src/eval-apply.c */
-struct scm *pairlis (struct scm *x, struct scm *y, struct scm *a);
-struct scm *set_car_x (struct scm *x, struct scm *e);
-struct scm *set_cdr_x (struct scm *x, struct scm *e);
-struct scm *add_formals (struct scm *formals, struct scm *x);
-struct scm *eval_apply ();
-struct scm *primitive_load (struct scm *filename);
-struct scm *make_binding (struct scm *name, struct scm *variable);
+struct scm *display_backtrace (struct scm *kont);
 /* src/gc.c */
+struct scm *make_binding (struct scm *name, struct scm *variable);
 struct scm *gc_stats ();
 struct scm *cons (struct scm *x, struct scm *y);
-struct scm *gc_check ();
-struct scm *gc ();
 /* src/hash.c */
 struct scm *hashq (struct scm *x, struct scm *size);
 struct scm *hash (struct scm *x, struct scm *size);
@@ -83,6 +75,9 @@ struct scm *hash_clear_x (struct scm *table);
 struct scm *type_ (struct scm *x);
 struct scm *car_ (struct scm *x);
 struct scm *cdr_ (struct scm *x);
+struct scm *set_car_x (struct scm *x, struct scm *e);
+struct scm *set_cdr_x (struct scm *x, struct scm *e);
+struct scm *pairlis (struct scm *x, struct scm *y, struct scm *a);
 struct scm *xassq (struct scm *x, struct scm *a);
 struct scm *memq (struct scm *x, struct scm *a);
 struct scm *equal2_p (struct scm *a, struct scm *b);
@@ -91,6 +86,7 @@ struct scm *pair_p (struct scm *x);
 struct scm *char_to_integer (struct scm *x);
 struct scm *integer_to_char (struct scm *x);
 struct scm *make_bytevector (struct scm *args);
+struct scm *bytevector_fill_x (struct scm *x);
 struct scm *bytevector_u8_ref (struct scm *bv, struct scm *k);
 struct scm *bytevector_u8_set_x (struct scm *bv, struct scm *k, struct scm *value);
 /* src/math.c */
@@ -111,6 +107,10 @@ struct scm *ash (struct scm *n, struct scm *count);
 struct scm *initial_module ();
 struct scm *current_module ();
 struct scm *set_current_module (struct scm *module);
+struct scm *module_variable (struct scm *module, struct scm *name);
+struct scm *module_local_variable (struct scm *module, struct scm *name);
+struct scm *module_ensure_local_variable_x (struct scm *module, struct scm *name);
+struct scm *module_define_x (struct scm *module, struct scm *name, struct scm *value);
 /* src/posix.c */
 struct scm *abort_ ();
 struct scm *exit_ (struct scm *x);
@@ -152,10 +152,10 @@ struct scm *dup2_ (struct scm *old, struct scm *new);
 struct scm *delete_file (struct scm *file_name);
 struct scm *uname_ ();
 /* src/reader.c */
-struct scm *read_input_file_env_ (struct scm *e, struct scm *a);
-struct scm *read_input_file_env (struct scm *a);
-struct scm *read_env (struct scm *a);
-struct scm *reader_read_sexp (struct scm *c, struct scm *s, struct scm *a);
+struct scm *read_input_file_ (struct scm *e);
+struct scm *read_input_file ();
+struct scm *reader_read ();
+struct scm *reader_read_sexp (struct scm *c, struct scm *s);
 struct scm *reader_read_character ();
 struct scm *reader_read_binary ();
 struct scm *reader_read_octal ();
@@ -180,6 +180,8 @@ struct scm *string_append (struct scm *x);
 struct scm *string_length (struct scm *string);
 struct scm *string_ref (struct scm *str, struct scm *k);
 struct scm *string_set_x (struct scm *str, struct scm *k, struct scm *c);
+struct scm *string_copy_x (struct scm *x);
+struct scm *make_string_init (struct scm *x);
 /* src/struct.c */
 struct scm *make_struct (struct scm *type, struct scm *fields, struct scm *printer);
 struct scm *struct_length (struct scm *x);
@@ -190,15 +192,20 @@ struct scm *make_variable (struct scm *var);
 struct scm *variable_p (struct scm *x);
 struct scm *variable_ref (struct scm *var);
 struct scm *variable_set_x (struct scm *var, struct scm *value);
-struct scm *variable_printer (struct scm *var);
 /* src/vector.c */
 struct scm *make_vector (struct scm *x);
 struct scm *vector_length (struct scm *x);
 struct scm *vector_ref (struct scm *x, struct scm *i);
-struct scm *vector_entry (struct scm *x);
 struct scm *vector_set_x (struct scm *x, struct scm *i, struct scm *e);
 struct scm *list_to_vector (struct scm *x);
 struct scm *vector_to_list (struct scm *v);
+struct scm *vector_copy_x (struct scm *x);
+struct scm *vector_fill_x (struct scm *x);
+/* src/compiler.c */
+struct scm *compile_top_level_exp (struct scm *exp, struct scm *mod);
+struct scm *procedure_name (struct scm *closure);
+struct scm *procedure_arguments (struct scm *closure);
+struct scm *procedure_disassemble (struct scm *closure);
 
 /* This is a conditional compilation hack for M2-Planet in bootstrap
    mode.  The following file will not be included in the M2-Planet build

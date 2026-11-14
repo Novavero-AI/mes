@@ -1,6 +1,6 @@
 ;;; GNU Mes --- Maxwell Equations of Software
-;;; Copyright © 2016,2017,2018,2019,2020,2021,2022,2023,2024,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
-;;; Copyright © 2022 Timothy Sample <samplet@ngyro.com>
+;;; Copyright © 2016-2026 Janneke Nieuwenhuizen <janneke@gnu.org>
+;;; Copyright © 2022,2026 Timothy Sample <samplet@ngyro.com>
 ;;;
 ;;; This file is part of GNU Mes.
 ;;;
@@ -19,17 +19,20 @@
 
 (define-module (mes repl)
   #:use-module (mes mes-0)
+  #:use-module (srfi srfi-1)
+  #:use-module (srfi srfi-11)
   #:use-module (srfi srfi-14)
   #:export (repl))
 
 (define welcome
   (string-append "GNU Mes " %version "
-Copyright (C) 2016,2017,2018,2019,2020,2021,2022,2023,2024,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
+Copyright (C) 2016-2026 Janneke Nieuwenhuizen <janneke@gnu.org>
 Copyright (C) 2019,2020,2021 Danny Milosavljevic <dannym@scratchpost.org>
 Copyright (C) 2021 Wladimir van der Laan <laanwj@protonmail.com>
-Copyright (C) 2022,2023 Timothy Sample <samplet@ngyro.com>
-Copyright (C) 2022,2023,2025 Ekaitz Zarraga <ekaitz@elenq.tech>
-Copyright (C) 2023,2025 Andrius Štikonas <andrius@stikonas.eu>
+Copyright (C) 2022,2023,2026 Timothy Sample <samplet@ngyro.com>
+Copyright (C) 2022,2023,2025,2026 Ekaitz Zarraga <ekaitz@elenq.tech>
+Copyright (C) 2023,2025,2026 Andrius Štikonas <andrius@stikonas.eu>
+Copyright (C) 2025,2026 Stefan <stefan-guix@vodafonemail.de>
 and others.
 
 GNU Mes comes with ABSOLUTELY NO WARRANTY; for details type `,show w'.
@@ -113,99 +116,90 @@ along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
 
 (define (repl)
   (let ((count 0)
-        (print-sexp? #t))
+        (print-sexp? #t)
+        (repl-module (current-module))
+        (user-module (resolve-module '(guile-user))))
 
-    (define (expand a)
-      (lambda ()
-        (let ((sexp (read)))
-          (when #t print-sexp?
-                (display "[sexp=")
-                (display sexp)
-                (display "]")
-                (newline))
-          (core:macro-expand sexp))))
+    (define (id-sym count)
+      (string->symbol (string-append "$" (number->string count))))
 
-    (define (load-env file-name a)
-      (push! *input-ports* (current-input-port))
-      (set-current-input-port
-       (open-input-file file-name))
-      (let ((x (core:eval (append2 (cons 'begin (read-input-file-env a))
-                                   '((current-module)))
-                          a)))
-        (set-current-input-port (pop! *input-ports*))
-        x))
-
-    (define (mes-load-module-env module a)
-      (push! *input-ports* (current-input-port))
-      (set-current-input-port
-       (open-input-file (string-append %moduledir (module->file module))))
-      (let ((x (core:eval (append2 (cons 'begin (read-input-file-env a))
-                                   '((current-module)))
-                          a)))
-        (set-current-input-port (pop! *input-ports*))
-        x))
+    (define (exp)
+      (let ((sexp (read)))
+        (when #t print-sexp?
+              (display "[sexp=")
+              (display sexp)
+              (display "]")
+              (newline))
+        (expand sexp)))
 
     (define (help . x) (display help-commands) *unspecified*)
     (define (show . x)
       (define topic-alist `((#\newline . ,show-commands)
                             (#\c . ,copying)
                             (#\w . ,warranty)))
-      (let* ((word (read-env '()))
+      (let* ((word (reader-read))
              (topic (find (negate char-whitespace?) (symbol->list word))))
         (display (assoc-ref topic-alist topic))
         *unspecified*))
     (define (quit . x)
       (exit 0))
-    (define (use a)
-      (lambda ()
-        (let ((name (read)))
-          (let ((mod (resolve-interface name)))
-            (if mod (module-use! (current-module) mod)
-                (simple-format (current-error-port)
-                               "No such module: ~A~%" name)))
-          name)))
-    (define (meta command a)
-      (let ((command-alist `((expand . ,(expand a))
+    (define (use)
+      (let ((name (read)))
+        (let ((mod (resolve-interface name)))
+          (if mod (module-use! user-module mod)
+              (simple-format (current-error-port)
+                             "No such module: ~A~%" name)))
+        name))
+    (define (meta command)
+      (let ((command-alist `((expand . ,exp)
                              (help . ,help)
                              (quit . ,quit)
                              (show . ,show)
-                             (use . ,(use a)))))
+                             (use . ,use))))
         ((or (assoc-ref command-alist command)
              (lambda () #f)))))
 
     (display welcome)
-    (let loop ((a (current-environment)))
-      (display "mes> ")
+    (let loop ()
+      (display "mes@")
+      (display (module-name user-module))
+      (display "> ")
       (force-output)
       (catch #t
         (lambda ()
-          (let ((sexp (read-env a)))
+          (let ((sexp (reader-read)))
             (when (not (eq? sexp '()))
               (when print-sexp?
                 (display "[sexp=")
                 (display sexp)
                 (display "]")
                 (newline))
-              (cond
-               ((and (pair? sexp) (eq? (car sexp) 'mes-use-module))
-                (let ((module (cadr sexp)))
-                  (mes-load-module-env module a)
-                  (loop a)))
-               ((and (pair? sexp) (memq (car sexp) '(include load)))
-                (load-env (cadr sexp) a)
-                (loop a))
-               (else
-                (let ((e (if (and (pair? sexp) (eq? (car sexp) (string->symbol "unquote")))
-                             (meta (cadr sexp) a)
-                             (core:eval sexp a))))
-                  (if (eq? e *unspecified*) (loop a)
-                      (let ((id (string->symbol (string-append "$" (number->string count)))))
+              (let ((e (if (and (pair? sexp) (eq? (car sexp) 'unquote))
+                           (list (meta (cadr sexp)))
+                           (dynamic-wind
+                             (lambda ()
+                               (set! repl-module (current-module))
+                               (set-current-module user-module))
+                             (lambda ()
+                               (let-values ((e (eval sexp)))
+                                 (remove (lambda (v) (eq? *unspecified* v)) e)))
+                             (lambda ()
+                               (set! user-module (current-module))
+                               (set-current-module repl-module))))))
+                (let value-loop ((vals e))
+                  (if (null? vals)
+                      (loop)
+                      (let id-loop ((id (id-sym count)))
                         (set! count (+ count 1))
-                        (display id)
-                        (display " = ")
-                        (write e)
-                        (newline)
-                        (loop (acons id e a))))))))))
+                        (if (module-defined? user-module id)
+                            (id-loop (id-sym count))
+                            (begin
+                              (display id)
+                              (display " = ")
+                              (write (car vals))
+                              (newline)
+                              (module-define! user-module id (car vals))
+                              (value-loop (cdr vals)))))))))))
         (lambda (key . args)
           (if (defined? 'with-output-to-string)
               (simple-format (current-error-port) "exception: ~a: ~s\n" key args)
@@ -215,4 +209,4 @@ along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
                 (display ": " (current-error-port))
                 (write args (current-error-port))
                 (newline (current-error-port))))
-          (loop a))))))
+          (loop))))))

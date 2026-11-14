@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2016,2017,2022 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Stefan <stefan-guix@vodafonemail.de>
  *
  * This file is part of GNU Mes.
  *
@@ -31,6 +32,8 @@
 
 #else // ! SYSTEM_LIBC
 
+#include <stdarg.h>
+
 #ifndef _IOFBF
 #define _IOFBF 0                /* Fully buffered.  */
 #define _IOLBF 1                /* Line buffered.  */
@@ -55,8 +58,11 @@
 #define SEEK_CUR 1
 #define SEEK_END 2
 
+void clearerr (FILE * stream);
 FILE *fdopen (int fd, char const *mode);
+int fileno (FILE * stream);
 FILE *fopen (char const *file_name, char const *mode);
+FILE *freopen (char const *file_name, char const *opentype, FILE * stream);
 int eputc (int c);
 int eputs (char const *s);
 int fclose (FILE * stream);
@@ -77,6 +83,8 @@ int putchar (int c);
 int puts (char const *s);
 int remove (char const *file_name);
 int rename (char const *old_name, char const *new_name);
+void rewind (FILE *stream);
+void setbuf (FILE *stream, char *buf);
 int setvbuf (FILE * stream, char *buf, int mode, size_t size);
 int ungetc (int c, FILE * stream);
 long ftell (FILE * stream);
@@ -92,6 +100,13 @@ int printf (char const *format, ...);
 int snprintf (char *str, size_t size, char const *format, ...);
 int sprintf (char *str, char const *format, ...);
 int sscanf (char const *str, char const *format, ...);
+
+int vfprintf (FILE * stream, char const *template, va_list ap);
+int vfscanf (FILE * stream, char const *template, va_list ap);
+int vprintf (char const *format, va_list ap);
+int vsnprintf (char *str, size_t size, char const *format, va_list ap);
+int vsprintf (char *str, char const *format, va_list ap);
+int vsscanf (char const *s, char const *template, va_list ap);
 #endif // !__M2__
 
 #endif // ! SYSTEM_LIBC

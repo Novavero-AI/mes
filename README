@@ -21,15 +21,14 @@ support a REPL and a C99 compiler: mescc.
 
 Mes + MesCC + Mes C Library can build a [[https://gitlab.com/janneke/tinycc][bootstrappable TinyCC]] that is
 self-hosting.  Using this bootstrappable-tcc and the Mes C library we
-can build an ancient version of the GNU tools triplet: glibc-2.2.5,
-binutils-2.20.1, gcc-2.95.3.  This is enough to bootstrap Guix for
-i686-linux, x86_64-linux, armhf-linux and aarch64-linux.
+can build gcc-4.6.  This is enough to bootstrap Guix for i686-linux,
+x86_64-linux, armhf-linux, aarch64-linux, and riscv64-linux.
 
 Mes was inspired by The Maxwell Equations of Software: [[https://www.softwarepreservation.org/projects/LISP/book/LISP%201.5%20Programmers%20Manual.pdf][LISP-1.5]] -- John
 McCarthy page 13, Guix's source/binary packaging transparency and
-Jeremiah Orians's [[https://github.com/oriansj/stage0][stage0]], a ~500-byte self-hosting hex assembler.
+Jeremiah Orians's [[https://github.com/oriansj/stage0][stage0]], a ~300-byte self-hosting hex assembler.
 
-We are very grateful to NLNet for sponsoring the [[https://nlnet.nl/project/GNUMes][Reduced Binary Seed
+We are very grateful to NLnet for sponsoring the [[https://nlnet.nl/project/GNUMes][Reduced Binary Seed
 bootstrap]], the [[https://nlnet.nl/project/GNUMes-arm][ARM port]], and the [[https://nlnet.nl/project/GNUMes-ARM_RISC-V][Full Source Bootstrap.]]
 
 GNU Mes is free software, it is distributed under the terms of the GNU
@@ -82,8 +81,24 @@ General Public Licence version 3 or later.  See the file [[file:COPYING][COPYING
   [13] https://nlnet.nl/project/GNUMes-arm
   [14] https://nlnet.nl/project/GNUMes-ARM_RISC-V
 
+* Copyright Notices
+
+GNU Mes is made available under the GNU GPL version 3 or later license,
+and authors retain their copyright.  For copyright notices, we adhere to
+the guidance documented in (info "(maintain) Copyright Notices"), and
+explicitly allow ranges instead of individual years.  Here's an example
+of the preferred style used for copyright notices in source file
+headers:
+
+#+begin_comment
+Copyright © 2019-2023, 2025 Your Name <your@email.org>
+#+end_comment
+
+Meaning there were copyright-able changes made for the years 2019, 2020, 2021,
+2022, 2023 and 2025.
+
 * Legalese
-Copyright © 2016,2017,2018,2019,2020,2021,2022,2023 Janneke Nieuwenhuizen <[[mailto:janneke@gnu.org][janneke@gnu.org]]>
+Copyright © 2016-2023, 2026 Janneke Nieuwenhuizen <[[mailto:janneke@gnu.org][janneke@gnu.org]]>
 
   Copying and distribution of this file, with or without modification,
   are permitted in any medium without royalty provided the copyright

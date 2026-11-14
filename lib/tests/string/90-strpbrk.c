@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2018,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2026 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -44,12 +45,14 @@ main ()
     return 3;
   eputs ("\n");
 
-  if (strspn ("hello, world", "abcdefghijklmnopqrstuvwxyz") != 5)
+  if (strpbrk ("hello, world", "abc") != NULL)
     return 4;
 
-  if (strcspn ("hello, world", " \t\n,.;!?") != 5)
+  if (strspn ("hello, world", "abcdefghijklmnopqrstuvwxyz") != 5)
     return 5;
 
+  if (strcspn ("hello, world", " \t\n,.;!?") != 5)
+    return 6;
 
   return 0;
 }

@@ -1,8 +1,9 @@
                                                               -*- org -*-
-#+TITLE: GNU Mes NEWS – history of user-visible changes
+#+TITLE: GNU Mes NEWS -– History of user-visible changes
 #+STARTUP: content hidestars
 
-Copyright © 2016,2017,2018,2019,2021,2022,2023,2024,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
+Copyright © 2016-2026 Janneke Nieuwenhuizen <janneke@gnu.org>
+Copyright © 2026 Ekaitz Zarraga <ekaitz@elenq.tech>
 
   Copying and distribution of this file, with or without modification,
   are permitted in any medium without royalty provided the copyright
@@ -10,6 +11,61 @@ Copyright © 2016,2017,2018,2019,2021,2022,2023,2024,2025 Janneke Nieuwenhuizen 
 
 Please send Mes bug reports to bug-mes@gnu.org.
 
+* Changes in 0.28 since 0.27.2
+** Core
+*** Evaluator is replaced by a compiler and a bytecode virtual machine.
+*** Macro expander is written in Scheme.
+*** Stack and Heap are now allocated separatedly.
+*** Structs and Vectors are now Bytes with raw pointers to their elements.
+*** Builtins are now indices to a static table.
+*** initial-module is now a module instead of just an obarray.
+*** Variables are now basic types and not records.
+*** Builtins now fail throwing exceptions instead of halting the execution.
+*** Overall, the interpreter performance has been improved by a 40% (execution
+time).
+** Mes
+*** REPL accepts multiple return values.
+*** Module eval-closure is removed.
+*** current-environment is removed.
+*** 4 new functions are added:
+bytevector-fill!, procedure-name, procedure-arguments, procedure-disassemble
+** MesCC
+*** Memory used in global uninitialized arrays is vastly reduced.
+** Noteworthy bug fixes
+*** close-port now returns a value: *unspecified*.
+* Changes in 0.27.2 since 0.27.1
+** Core
+*** Cast functions were removed.
+*** Several pre-1.13.1 M2-Planet workarounds were removed.
+** Build
+*** Mes now requires M2-Planet >= 1.13.1.
+*** Mes is now installable as a Guix channnel:
+guix time-machine \
+  --channels=https://cgit.git.savannah.gnu.org/cgit/mes.git/tree/build-aux/channels.sh \
+  -- shell mes
+*** GNUmakefile supports building `.go' files directly
+*** Running the test suite during bootstrap, with Gash, is now supported
+*** Mes now builds with gcc-16.
+** Mes
+*** 6 new functions were added:
+string-copy!, vector-copy!, vector-copy!, vector-fill!, vector-fill,
+vector-fold-right.
+** MesCC
+*** MesCC now works with NYACC versions 2.02.4 and 3.00.0
+*** MesCC now ignores some common options: -f*, -M*, -W*.
+*** MesCC now fails early when pre-processing fails.
+** Mes C Library
+*** 13 prototypes were added:
+clearerr, ctime, fileno, freopen, getpwnam, mktmp, rewind, setbuf
+sigblock, sigemptyset, sigsetmask strdup, ttyname.
+*** The v*printf and v*scanf prototypes were moved to stdio.h
+** Noteworthy bug fixes
+*** The build system no longer compiles each file twice
+This was a tracing regression/typo introduced in v0.20
+*** A bug in string-every was fixed and made more efficient.
+*** A bug in define-private was fixed.
+*** A workaround for a hygiene problem in `or' using `r' was added.
+*** The reader now skips escaped newline characters.
 * Changes in 0.27.1 since 0.27
 ** Core
 *** The pmatch-car/pmatch-cdr hack was removed.

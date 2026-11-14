@@ -1,6 +1,6 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
- * Copyright © 2016,2017,2018,2019,2020,2022 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2016,2017,2018,2019,2020,2022,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
  * Copyright © 2023 Timothy Sample <samplet@ngyro.com>
  *
  * This file is part of GNU Mes.
@@ -33,6 +33,7 @@ char *cast_long_to_charp (long i);
 long cast_charp_to_long (char const *);
 long cast_int_to_long (int i);
 long cast_voidp_to_long (void const *);
+long *cast_voidp_to_longp (void const *);
 
 int __mes_debug ();
 void __ungetc_init ();

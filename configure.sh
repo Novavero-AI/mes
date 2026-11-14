@@ -1,8 +1,8 @@
 #! /bin/sh
 
 # GNU Mes --- Maxwell Equations of Software
-# Copyright © 2018,2019,2021,2022,2023,2024,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
-# Copyright © 2023, 2024 Ekaitz Zarraga <ekaitz@elenq.tech>
+# Copyright © 2018-2026 Janneke Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2023-2024,2026 Ekaitz Zarraga <ekaitz@elenq.tech>
 #
 # This file is part of GNU Mes.
 #
@@ -21,7 +21,7 @@
 
 set -e
 
-VERSION=0.27.1
+VERSION=0.28
 srcdir=${srcdir-$(dirname $0)}
 srcdest=
 if test "$srcdir" != "."; then
@@ -158,6 +158,7 @@ subst () {
     -e s,"@GUILD@,$GUILD,"\
     -e s,"@GUILE@,$GUILE,"\
     -e s,"@PERL@,$PERL,"\
+    -e s,"@CPPFLAGS@,$CPPFLAGS,"\
     -e s,"@CFLAGS@,$CFLAGS,"\
     -e s,"@HEX2@,$HEX2,"\
     -e s,"@HEX2FLAGS@,$HEX2FLAGS,"\

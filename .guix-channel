@@ -1,0 +1,6 @@
+;; This -*-scheme-*- repo is also  a Guix channel.
+
+(channel
+  (version 0)
+  (directory ".guix/module")
+  (url "https://git.savannah.gnu.org/git/mes.git"))

@@ -32,5 +32,7 @@
       (core:write-error port)
       (core:display-error "\n")
       (exit (if (equal2? string "foo bar\n") 0 1)))
-    ((if (current-module) (@ (ice-9 rdelim) read-string) read-string) port)))
+    ((if (eq? (initial-module) (current-module))
+         read-string
+         (@ (ice-9 rdelim) read-string)) port)))
  (open-input-string "foo bar\n"))

@@ -70,10 +70,9 @@
 
 
 (define (identity x) x)
-(define call/cc call-with-current-continuation)
 
 (define (command-line) %argv)
-(define (read) (read-env (current-environment)))
+(define (read) (reader-read))
 
 (define-macro (and . x)
   (if (null? x) #t
@@ -84,8 +83,8 @@
 (define-macro (or . x)
   (if (null? x) #f
       (if (null? (cdr x)) (car x)
-          (list (list 'lambda (list 'r)
-                      (list 'if 'r 'r
+          (list (list 'lambda (list '*-0)
+                      (list 'if '*-0 '*-0
                             (cons 'or (cdr x))))
                 (car x)))))
 

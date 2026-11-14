@@ -107,6 +107,7 @@ char *sbrk (ptrdiff_t delta);
 void *sbrk (intptr_t delta);
 #endif
 int symlink (char const *old_name, char const *new_name);
+char *ttyname (int fd);
 int unlink (char const *file_name);
 ssize_t write (int filedes, void const *buffer, size_t size);
 

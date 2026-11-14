@@ -1,7 +1,7 @@
 #!/bin/sh
 # test-driver - basic testsuite driver script.
 
-scriptversion=2018-03-07.03; # UTC
+scriptversion=2025-09-10.14; # UTC
 
 # Copyright (C) 2011-2018 Free Software Foundation, Inc.
 #
@@ -67,6 +67,7 @@ while test $# -gt 0; do
   --expect-failure) expect_failure=$2; shift;;
   --enable-hard-errors) enable_hard_errors=$2; shift;;
   --) shift; break;;
+  ---) shift; break;;
   -*) usage_error "invalid option: '$1'";;
    *) break;;
   esac

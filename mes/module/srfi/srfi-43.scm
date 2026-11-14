@@ -1,6 +1,7 @@
 ;;; GNU Mes --- Maxwell Equations of Software
 ;;; Copyright © 2016,2018,2020 Janneke Nieuwenhuizen <janneke@gnu.org>
 ;;; Copyright © 2023, 2023 Timothy Sample <samplet@ngyro.com>
+;;; Copyright © 2025 Ekaitz Zarraga <ekaitz@elenq.tech>
 ;;;
 ;;; This file is part of GNU Mes.
 ;;;
@@ -27,7 +28,7 @@
   #:export (vector-map
             vector-for-each
             vector-fold
-            vector-copy!)
+            vector-fold-right)
   #:re-export (vector-copy))
 
 (define (vector-map f v)
@@ -52,8 +53,19 @@
     (if (>= k (vector-length vec)) acc
         (loop (+ k 1) (kons k acc (vector-ref vec k))))))
 
-(define (vector-copy! target tstart source sstart send)
-  (let loop ((tk tstart) (sk sstart))
-    (when (< sk send)
-      (vector-set! target tk (vector-ref source sk))
-      (loop (+ tk 1) (+ sk 1)))))
+(define (vector-fold-right kons knil vec)
+  (let loop ((k (- (vector-length vec) 1)) (acc knil))
+    (if (< k 0) acc
+        (loop (- k 1) (kons k acc (vector-ref vec k)))))))
+
+
+(cond-expand
+ (mes
+  #t)
+ (else
+  (define (vector-copy! target tstart source sstart send)
+    (let loop ((tk tstart) (sk sstart))
+      (when (< sk send)
+        (vector-set! target tk (vector-ref source sk))
+        (loop (+ tk 1) (+ sk 1)))))
+  (export vector-copy!)))

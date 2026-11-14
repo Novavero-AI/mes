@@ -3,6 +3,7 @@
  * Copyright © 2016,2017,2018,2019,2020,2021,2023 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
  * Copyright © 2021 W. J. van der Laan <laanwj@protonmail.com>
  * Copyright © 2022 Timothy Sample <samplet@ngyro.com>
+ * Copyright © 2025 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -32,37 +33,9 @@
 #include <time.h>
 
 struct scm *
-mes_g_stack (struct scm *a)             /*:((internal)) */
-{
-  g_stack = STACK_SIZE;
-  R0 = a;
-  R1 = make_char (0);
-  R2 = make_char (0);
-  R3 = make_char (0);
-  return R0;
-}
-
-struct scm *
 mes_environment (int argc, char **argv)
 {
   struct scm *a = init_symbols ();
-
-  /* These are symbols that the evaluator treats specially.  We bind
-     them to themselves so that they can be looked up and bound at
-     expansion time. */
-  a = acons (cell_symbol_call_with_current_continuation,
-             cell_symbol_call_with_current_continuation, a);
-  a = acons (cell_symbol_call_with_values,
-             cell_symbol_call_with_values, a);
-  a = acons (cell_symbol_current_environment,
-             cell_symbol_current_environment, a);
-  a = acons (cell_symbol_lambda, cell_symbol_lambda, a);
-  a = acons (cell_symbol_quote, cell_symbol_quote, a);
-  a = acons (cell_symbol_begin, cell_symbol_begin, a);
-  a = acons (cell_symbol_if, cell_symbol_if, a);
-  a = acons (cell_symbol_set_x, cell_symbol_set_x, a);
-  a = acons (cell_symbol_define, cell_symbol_define, a);
-  a = acons (cell_symbol_define_macro, cell_symbol_define_macro, a);
 
   char *compiler = "gnuc";
 #if __MESC__
@@ -97,8 +70,7 @@ mes_environment (int argc, char **argv)
     lst = cons (make_string0 (argv[i]), lst);
   a = acons (cell_symbol_argv, lst, a);
 #endif
-
-  return mes_g_stack (a);
+  return a;
 }
 
 int
@@ -130,10 +102,7 @@ open_boot ()
   char *boot = __open_boot_buf;
   char *file_name = __open_boot_file_name;
   strcpy (g_datadir, ".");
-  if (getenv ("MES_BOOT") != 0)
-    strcpy (boot, getenv ("MES_BOOT"));
-  else
-    strcpy (boot, "boot-5.scm");
+  strcpy (boot, "boot.scm");
   if (getenv ("MES_PREFIX") != 0)
     {
       strcpy (g_datadir, getenv ("MES_PREFIX"));
@@ -177,9 +146,9 @@ open_boot ()
 struct scm *
 read_boot ()                    /*:((internal)) */
 {
-  R2 = read_input_file_env (R0);
+  struct scm *program = read_input_file ();
   __stdin = STDIN;
-  return R2;
+  return program;
 }
 
 void
@@ -203,7 +172,7 @@ init ()
   char *p = getenv ("MES_DEBUG");
   if (p != 0)
     g_debug = atoi (p);
-  g_mini = cast_charp_to_long (getenv ("MES_MINI"));
+  g_mini = (long) getenv ("MES_MINI");
   open_boot ();
   gc_init ();
 }
@@ -218,8 +187,6 @@ main (int argc, char **argv)
   a = init_time (a);
   M0 = make_initial_module (a);
   M1 = cell_f;
-  R0 = cell_nil;
-  g_macros = make_hash_table_ (0);
 
   if (g_debug > 5)
     {
@@ -228,26 +195,31 @@ main (int argc, char **argv)
     }
 
   struct scm *program = read_boot ();
-  R0 = acons (cell_symbol_program, program, R0);
-  push_cc (R2, cell_unspecified, R0, cell_unspecified);
 
   if (g_debug > 2)
     gc_stats_ ("\n gc boot");
   if (g_debug > 3)
     {
       eputs ("program: ");
-      write_error_ (R1);
+      write_error_ (program);
       eputs ("\n");
     }
-  R3 = cell_vm_begin_expand;
-  R1 = eval_apply ();
-  if (g_debug != 0)
+  /* Kickstart the initial boot file doing the bare minimum: eval one by one.
+   * It will evaluate the bootstrapping macro expander and drive from there.
+   */
+  struct scm *result;
+  struct scm *cur;
+  for (cur = program; cur != cell_nil; cur = cur->cdr)
     {
-      write_error_ (R1);
-      eputs ("\n");
+      stack_push (cur);   /* Preserve from garbage collection */
+      result = apply (compile_top_level_exp (cur->car, current_module ()), cell_nil);
+      cur = stack_pop (); /* Recover pointer just in case it was moved */
     }
   if (g_debug != 0)
     {
+      eputs ("program result: ");
+      write_error_ (result);
+      eputs ("\n");
       if (g_debug > 5)
         {
           eputs ("initial module obarray\n");
@@ -256,9 +228,7 @@ main (int argc, char **argv)
 
       if (g_debug < 3)
         gc_stats_ ("\ngc run");
-      MAX_ARENA_SIZE = 0;
 
-      gc (g_stack);
       if (g_debug < 3)
         gc_stats_ (" => ");
 

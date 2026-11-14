@@ -62,7 +62,8 @@ exit_ (struct scm *x)                   /*:((name . "exit")) */
     status = 1;
   else
     {
-      assert_msg (x->type == TNUMBER, "x->type == TNUMBER");
+      if (x->type != TNUMBER)
+        error (cell_symbol_wrong_type_arg, cons (x, cstring_to_symbol ("exit")));
       status = x->value;
     }
 
@@ -195,7 +196,8 @@ write_byte (struct scm *x)              /*:((arity . n)) */
   char cc = c->value;
   write (fd, &cc, 1);
 #if !__MESC__
-  assert_msg (c->type == TNUMBER || c->type == TCHAR, "c->type == TNUMBER || c->type == TCHAR");
+  if (c->type != TNUMBER && c->type != TCHAR)
+    error (cell_symbol_wrong_type_arg, cons (c, cstring_to_symbol ("write-byte")));
 #endif
   return c;
 }
@@ -381,7 +383,8 @@ execl_ (struct scm *file_name, struct scm *args)        /*:((name . "execl")) */
   struct scm *arg;
   while (args != cell_nil)
     {
-      assert_msg (args->car->type == TSTRING, "args->car->type == TSTRING");
+      if (args->car->type != TSTRING)
+        error (cell_symbol_wrong_type_arg, cons (args, cstring_to_symbol ("execl")));
       arg = args->car;
       c_argv[i] = cell_bytes (arg->string);
       i = i + 1;
@@ -416,7 +419,8 @@ execle_ (struct scm *file_name, struct scm *args, struct scm *env)
   struct scm *arg;
   while (args != cell_nil)
     {
-      assert_msg (args->car->type == TSTRING, "args->car->type == TSTRING");
+      if (args->car->type != TSTRING)
+        error (cell_symbol_wrong_type_arg, cons (args, cstring_to_symbol ("execle")));
       arg = args->car;
       c_argv[i] = cell_bytes (arg->string);
       i = i + 1;
@@ -434,7 +438,8 @@ execle_ (struct scm *file_name, struct scm *args, struct scm *env)
 
   while (env != cell_nil)
     {
-      assert_msg (env->car->type == TSTRING, "env->car->type == TSTRING");
+      if (env->car->type != TSTRING)
+        error (cell_symbol_wrong_type_arg, cons (env, cstring_to_symbol ("execle")));
       c_env[i] = cell_bytes (env->car->string);
       i = i + 1;
       env = env->cdr;

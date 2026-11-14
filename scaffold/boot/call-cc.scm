@@ -26,7 +26,7 @@
    (set! loop
          (lambda (i)
            (core:display global)
-           (core:display (values 'foobar global))
+           (core:display (cons 'foobar global))
            (core:display v)
            (core:display vv)
            (core:display "i=")

@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2016,2017,2018,2019,2020,2022 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -22,17 +23,20 @@
 #include "mes/mes.h"
 
 struct scm *
+make_vector_uninit_ (long k)
+{
+  size_t size = bytes_cells (sizeof (struct scm *) * k);
+  struct scm *v = alloc (size);
+  v->type = TVECTOR;
+  v->length = k;
+  return v;
+}
+
+struct scm *
 make_vector_ (long k, struct scm *e)
 {
-  struct scm *x = alloc (1);
-  struct scm *v = alloc (k);
-  x->type = TVECTOR;
-  x->length = k;
-  x->vector = v;
-  long i;
-  for (i = 0; i < k; i = i + 1)
-    copy_cell (cell_ref (v, i), vector_entry (e));
-
+  struct scm *x = make_vector_uninit_ (k);
+  vector_fill_x_ (x, e, 0, k);
   return x;
 }
 
@@ -40,7 +44,9 @@ struct scm *
 make_vector (struct scm *x)               /*:((arity . n)) */
 {
   struct scm *k = x->car;
-  assert_number ("make-vector", k);
+  if (k->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg,
+           cons (k, cstring_to_symbol ("make-vector")));
   long n = k->value;
   struct scm *e = cell_unspecified;
   if (x->cdr != cell_nil)
@@ -52,23 +58,23 @@ make_vector (struct scm *x)               /*:((arity . n)) */
 struct scm *
 vector_length (struct scm *x)
 {
-  assert_msg (x->type == TVECTOR, "x->type == TVECTOR");
+  if (x->type != TVECTOR)
+    error (cell_symbol_wrong_type_arg,
+           cons (x, cstring_to_symbol ("vector-length")));
   return make_number (x->length);
 }
 
 struct scm *
 vector_ref_ (struct scm *x, long i)
 {
-  assert_msg (x->type == TVECTOR, "x->type == TVECTOR");
-  assert_msg (i < x->length, "i < x->length");
-  struct scm *e = cell_ref (x->vector, i);
-  if (e->type == TREF)
-    e = e->ref;
-  if (e->type == TCHAR)
-    e = make_char (e->value);
-  if (e->type == TNUMBER)
-    e = make_number (e->value);
-  return e;
+  if (x->type != TVECTOR)
+    error (cell_symbol_wrong_type_arg,
+           cons (x, cstring_to_symbol ("vector-ref")));
+  if (i >= x->length)
+    error (cell_symbol_out_of_range,
+           cons (make_number (i), cstring_to_symbol ("vector-ref")));
+  struct scm **loc = vector_body (x) + i * M2_PTR_SIZE;
+  return *loc;
 }
 
 struct scm *
@@ -78,19 +84,16 @@ vector_ref (struct scm *x, struct scm *i)
 }
 
 struct scm *
-vector_entry (struct scm *x)
-{
-  if (x->type != TCHAR && x->type != TNUMBER)
-    x = make_ref (x);
-  return x;
-}
-
-struct scm *
 vector_set_x_ (struct scm *x, long i, struct scm *e)
 {
-  assert_msg (x->type == TVECTOR, "x->type == TVECTOR");
-  assert_msg (i < x->length, "i < x->length");
-  copy_cell (cell_ref (x->vector, i), vector_entry (e));
+  if (x->type != TVECTOR)
+    error (cell_symbol_wrong_type_arg,
+           cons (x, cstring_to_symbol ("vector-set!")));
+  if (i >= x->length)
+    error (cell_symbol_out_of_range,
+           cons (make_number (i), cstring_to_symbol ("vector-set!")));
+  struct scm **loc = vector_body (x) + i * M2_PTR_SIZE;
+  *loc = e;
   return cell_unspecified;
 }
 
@@ -104,11 +107,11 @@ struct scm *
 list_to_vector (struct scm *x)
 {
   struct scm *v = make_vector_ (length__ (x), cell_unspecified);
-  struct scm *p = v->vector;
+  size_t i = 0;
   while (x != cell_nil)
     {
-      copy_cell (p, vector_entry (car (x)));
-      p = p + M2_CELL_SIZE;
+      vector_set_x_ (v, i, car (x));
+      i = i + 1;
       x = cdr (x);
     }
   return v;
@@ -119,13 +122,131 @@ vector_to_list (struct scm *v)
 {
   struct scm *x = cell_nil;
   long i;
-  struct scm *e;
   for (i = v->length; i; i = i - 1)
-    {
-      e = cell_ref (v->vector, i - 1);
-      if (e->type == TREF)
-        e = e->ref;
-      x = cons (e, x);
-    }
+    x = cons (vector_ref_ (v, i - 1), x);
   return x;
+}
+
+struct scm *
+vector_fill_x_ (struct scm *vec, struct scm *fill, long start, long end)
+{
+  if (start > end)
+    error (cell_symbol_out_of_range,
+           cons (make_number (start), cstring_to_symbol ("vector-fill!")));
+  if (vec->length < end)
+    error (cell_symbol_out_of_range,
+           cons (make_number (end), cstring_to_symbol ("vector-fill!")));
+  long i;
+  for (i = start; i < end; i = i + 1)
+    vector_set_x_ (vec, i, fill);
+  return cell_unspecified;
+}
+
+struct scm *
+vector_fill_x (struct scm *x)               /*:((arity . n)) */
+{
+  /* Arguments */
+  struct scm *vec;
+  struct scm *fill;
+  struct scm *start; /* optional */
+  struct scm *end;   /* optional */
+
+  vec = x->car;
+  if (vec->type != TVECTOR)
+    error (cell_symbol_wrong_type_arg,
+           cons (vec, cstring_to_symbol ("vector-fill!")));
+  x = x->cdr;
+
+  if (x->type != TPAIR)
+    error (cell_symbol_wrong_number_of_args,
+           cons (make_number (length__(x)), cstring_to_symbol ("vector-fill!")));
+  fill = x->car;
+  x = x->cdr;
+
+  if (x->type != TPAIR)
+    return vector_fill_x_ (vec, fill, 0, vec->length);
+  start = x->car;
+  if (start->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg,
+           cons (start, cstring_to_symbol ("vector-fill!")));
+  x = x->cdr;
+
+  if (x->type != TPAIR)
+    return vector_fill_x_ (vec, fill, start->value, vec->length);
+  end = x->car;
+  if (end->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg,
+           cons (end, cstring_to_symbol ("vector-fill!")));
+
+  return vector_fill_x_ (vec, fill, start->value, end->value);
+}
+
+struct scm *
+vector_copy_x_ (struct scm *vec, long start, struct scm *source, long begin,
+              long end)
+{
+  if (vec->length - start < end - begin)
+    error (cell_symbol_out_of_range,
+           cons (list3 (make_number (start), make_number (begin), make_number (end)),
+                 cstring_to_symbol ("vector-copy!")));
+
+  long i;
+  for (i = begin; i < end; i = i + 1)
+    vector_set_x_ (vec, i - begin + start, vector_ref_ (source, i));
+  return cell_unspecified;
+}
+
+struct scm *
+vector_copy_x (struct scm *x)               /*:((arity . n)) */
+{
+  /* Arguments */
+  struct scm *vec;
+  struct scm *start;
+  struct scm *source;
+  struct scm *begin; /* optional */
+  struct scm *end;   /* optional */
+
+  if (x->type != TPAIR)
+    error (cell_symbol_wrong_number_of_args,
+           cons (make_number (length__(x)), cstring_to_symbol ("vector-copy!")));
+
+  vec = x->car;
+  if (vec->type != TVECTOR)
+    error (cell_symbol_wrong_type_arg, cons (vec, cstring_to_symbol ("vector-copy!")));
+
+  x = x->cdr;
+  if (x->type != TPAIR)
+    error (cell_symbol_wrong_number_of_args,
+           cons (make_number (length__(x)), cstring_to_symbol ("vector-copy!")));
+
+  start = x->car;
+  if (start->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg, cons (start, cstring_to_symbol ("vector-copy!")));
+
+  x = x->cdr;
+  if (x->type != TPAIR)
+    error (cell_symbol_wrong_number_of_args,
+           cons (make_number (length__(x)), cstring_to_symbol ("vector-copy!")));
+
+  source = x->car;
+  if (source->type != TVECTOR)
+    error (cell_symbol_wrong_type_arg, cons (source, cstring_to_symbol ("vector-copy!")));
+
+  x = x->cdr;
+  if (x->type != TPAIR)
+    return vector_copy_x_ (vec, start->value, source, 0, source->length);
+
+  begin = x->car;
+  if (begin->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg, cons (begin, cstring_to_symbol ("vector-copy!")));
+
+  x = x->cdr;
+  if (x->type != TPAIR)
+    return vector_copy_x_ (vec, start->value, source, begin->value, source->length);
+
+  end = x->car;
+  if (end->type != TNUMBER)
+    error (cell_symbol_wrong_type_arg, cons (end, cstring_to_symbol ("vector-copy!")));
+
+  return vector_copy_x_ (vec, start->value, source, begin->value, end->value);
 }

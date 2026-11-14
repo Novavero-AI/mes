@@ -30,7 +30,7 @@
                (core:write-error args)
                (core:display-error "\n")
                (core:display-error "Backtrace:\n")
-               (display-backtrace (make-stack) (current-error-port))
+               (core:call/cc display-backtrace)
                (abort))))
 
 (define (catch key thunk handler)
@@ -64,35 +64,3 @@
     (apply handler (cons key args))))
 
 (define with-throw-handler catch) ; FIXME: hack for Nyacc 0.75
-
-(define (frame-procedure frame)
-  (let ((f (struct-ref frame 3)))
-    (or (builtin? f)
-        (closure? f))))
-
-(define (display-frame frame port)
-  (core:display-error "  ")
-  (let ((f (struct-ref frame 3)))
-    (cond ((builtin? f)
-           (core:display-error "[b] ")
-           (core:display-error "(")
-           (core:display-error (struct-ref f 3))
-           (for-each (lambda (i) (core:display-error " _")) (iota (struct-ref f 4)))
-           (core:display-error ")"))
-          ((closure? f)
-           (core:display-error "[c] ")
-           (let* ((circ (core:car (core:cdr f)))
-                  (name (core:car (core:car (core:cdr circ))))
-                  (args (core:car (core:cdr (core:cdr f)))))
-             (core:display-error (cons name args))))
-          (else
-           (core:display-error "[u] ")
-           (core:display-error f))))
-  (core:display-error "\n"))
-
-(define (display-backtrace stack port . rest)
-  (let* ((frames (map (lambda (i) (stack-ref stack i)) (iota (stack-length stack))))
-         (call-frames (filter frame-procedure frames))
-         (trace-frames (reverse call-frames))
-         (display-frames (cdr trace-frames)))
-    (for-each (lambda (f) (display-frame f port)) display-frames)))

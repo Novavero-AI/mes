@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
- * Copyright © 2016,2017,2018,2019,2022 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2016,2017,2018,2019,2022,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Andrius Štikonas <andrius@stikonas.eu>
  *
  * This file is part of GNU Mes.
  *
@@ -31,6 +32,11 @@ wait4 (pid_t pid, int *status_ptr, int options, struct rusage *rusage)
   long long_status_ptr = cast_voidp_to_long (status_ptr);
   long long_options = options;
   long long_rusage = cast_voidp_to_long (rusage);
+#if __M2__
+  // M2-Planet uses 64bit INTs on 64bit platforms;
+  // make sure most significant 32bits are reset.
+  *long_status_ptr = 0;
+#endif
   return _sys_call4 (SYS_wait4, long_pid, long_status_ptr, long_options,
                      long_rusage);
 }

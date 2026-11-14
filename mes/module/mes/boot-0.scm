@@ -33,7 +33,8 @@
 (define (defined? x)
   ((lambda (v)
      (if v (if (eq? (variable-ref v) *undefined*) #f #t) #f))
-   (core:hashq-ref (initial-module) x #f)))
+   (module-variable (initial-module) x)))
+
 
 (define (cond-expand-expander clauses)
   (if (defined? (car (car clauses)))
@@ -79,7 +80,7 @@
   (loop rest (list)))
 
 (define (apply f h . t)
-  (if (null? t) (core:apply f h (current-environment))
+  (if (null? t) (core:apply f h)
       (apply f (apply cons* (cons h t)))))
 
 (define (append . rest)
@@ -114,8 +115,7 @@
 ;; boot-03.scm
 (define guile? #f)
 (define mes? #t)
-(define (primitive-eval e) (core:eval e (current-environment)))
-(define eval core:eval)
+(define primitive-eval eval)
 
 (define (port-filename port) "<stdin>")
 (define (port-line port) 0)
@@ -135,9 +135,6 @@
      (list 'primitive-load file)))
 
 (define-macro (include file) (list 'load file))
-
-(if (not (defined? '%datadir))
-    (module-define! (current-environment) '%datadir "mes"))
 
 (define %moduledir (string-append %datadir "/module/"))
 

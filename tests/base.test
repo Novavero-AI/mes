@@ -32,9 +32,9 @@ exec ${MES-bin/mes} --no-auto-compile -L ${0%/*} -L module -C module -e '(tests 
 
 (cond-expand
  (mes
-  (unless (current-module)
-    (primitive-load
-     (string-append (or (getenv "srcdest") "") "module/mes/test.scm"))))
+  (if (eq? (initial-module) (current-module))
+      (primitive-load (string-append (or (getenv "srcdest") "")
+                                     "module/mes/test.scm"))))
  (guile-2)
  (guile
   (use-modules (ice-9 syncase))))
@@ -118,15 +118,7 @@ exec ${MES-bin/mes} --no-auto-compile -L ${0%/*} -L module -C module -e '(tests 
 (define load.scm
   (string-append (or (getenv "srcdest") "") "tests/data/load.scm"))
 
-(define toplevel? #f)
-
 (pass-if-equal "primitive-load" 42 (primitive-load load.scm) the-answer)
-
-(pass-if-equal "primitive-load-toplevel"
-    #t
-  ((lambda ()
-     (primitive-load load.scm)))
-  toplevel?)
 
 (cond-expand
  (mes

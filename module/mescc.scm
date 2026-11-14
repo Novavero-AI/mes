@@ -1,5 +1,5 @@
 ;;; GNU Mes --- Maxwell Equations of Software
-;;; Copyright © 2016,2017,2018,2019,2023 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+;;; Copyright © 2016,2017,2018,2019,2023,2026 Janneke Nieuwenhuizen <janneke@gnu.org>
 ;;;
 ;;; This file is part of GNU Mes.
 ;;;
@@ -31,8 +31,7 @@
   (mes-use-module (mes misc))
   (mes-use-module (mes getopt-long))
   (mes-use-module (mes display))
-  (mes-use-module (mescc mescc))
-  )
+  (mes-use-module (mescc mescc)))
  (guile
   (define-macro (mes-use-module . rest) #t)))
 
@@ -65,7 +64,8 @@
             (define (single-char #\D) (value #t))
             (debug-info (single-char #\g))
             (dumpmachine)
-            (print-libgcc-file-name)
+            (feature (single-char #\f) (value #t))
+            (dependencies (single-char #\M) (value #t))
             (fno-builtin)
             (fno-stack-protector)
             (help (single-char #\h))
@@ -78,12 +78,14 @@
             (nostdinc)
             (nostdlib)
             (preprocess (single-char #\E))
+            (print-libgcc-file-name)
             (static)
             (std (value #t))
             (output (single-char #\o) (value #t))
             (optimize (single-char #\O) (value #t))
             (version (single-char #\V))
             (verbose (single-char #\v))
+            (warning (single-char #\W) (value #t))
             (write (single-char #\w) (value #t))
             (language (single-char #\x) (value #t))))
          (options (getopt-long args option-spec))

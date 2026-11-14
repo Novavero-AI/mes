@@ -53,6 +53,7 @@ int putenv (char *s);
 int setenv (char const *s, char const *v, int overwrite_p);
 void unsetenv (char const *name);
 void *malloc (size_t);
+char *mktemp (char *);
 void qsort (void *base, size_t nmemb, size_t size, int (*compar) (void const *, void const *));
 int rand (void);
 void *realloc (void *p, size_t size);

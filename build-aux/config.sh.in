@@ -1,5 +1,5 @@
 # GNU Mes --- Maxwell Equations of Software
-# Copyright © 2018,2023,2024 Janneke Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2018,2023,2024,2025 Janneke Nieuwenhuizen <janneke@gnu.org>
 #
 # This file is part of GNU Mes.
 #
@@ -31,6 +31,7 @@ GUILD_OPTIMIZE="${GUILD_OPTIMIZE-@GUILD_OPTIMIZE@}"
 GUILE="@GUILE@"
 GUILE_EFFECTIVE_VERSION="@GUILE_EFFECTIVE_VERSION@"
 GUILE_LOAD_PATH="@GUILE_LOAD_PATH@"
+GUILE_LOAD_COMPILED_PATH="@GUILE_LOAD_COMPILED_PATH@"
 GUIX="@GUIX@"
 HELP2MAN="@HELP2MAN@"
 HEX2="@HEX2@"
@@ -94,6 +95,8 @@ export PACKAGE_NAME
 export PACKAGE_BUGREPORT
 export AR
 export CC
+export CCFLAGS
+export CCPPFLAGS
 export DIFF
 export SHELL
 export V
@@ -106,6 +109,8 @@ export srcdest
 export srcdir
 export stage0_cpu
 export GUILE_AUTO_COMPILE
+export GUILE_LOAD_PATH
+export GUILE_LOAD_COMPILED_PATH
 export MES_PREFIX
 export TESTS
 export XFAIL_TESTS

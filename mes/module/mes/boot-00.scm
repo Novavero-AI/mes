@@ -22,7 +22,7 @@
 (define (defined? x)
   ((lambda (v)
      (if v (if (eq? (variable-ref v) *undefined*) #f #t) #f))
-   (core:hashq-ref (initial-module) x #f)))
+   (module-variable (initial-module) x)))
 
 (define (cond-expand-expander clauses)
   (if (defined? (car (car clauses)))
@@ -31,6 +31,12 @@
 
 (define-macro (cond-expand . clauses)
   (cons 'begin (cond-expand-expander clauses)))
+
+;; expose basic internals to scheme
+(define (call/cc x) (core:call/cc x))
+(define call-with-current-continuation call/cc)
+(define (gc) (core:gc))
+
 ;; end boot-00.scm
 
 (primitive-load 0)

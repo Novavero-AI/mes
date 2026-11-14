@@ -1,6 +1,7 @@
 # GNU Mes --- Maxwell Equations of Software
-# Copyright © 2018,2019,2021,2022,2023,2024 Janneke Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2018-2026 Janneke Nieuwenhuizen <janneke@gnu.org>
 # Copyright © 2023 Vagrant Cascadian <vagrant@debian.org>
+# Copyright © 2026 Ekaitz Zarraga <ekaitz@elenq.tech>
 #
 # This file is part of GNU Mes.
 #
@@ -100,6 +101,11 @@ build: | $(ARCH_HEADERS)
 
 src/${program_prefix}mes: build
 
+.git/hooks/pre-push: build-aux/pre-push.sh
+	@if [ -d .git ]; then cp -f $^ $@; fi
+
+all: .git/hooks/pre-push
+
 include/arch/%.h: $(srcdest)include/$(mes_kernel)/$(mes_cpu)/%.h | arch-dir
 	cp -f $< $@
 
@@ -155,6 +161,20 @@ all-go:
 
 clean-go:
 	rm -f $(shell find . -name '*.go')
+
+AM_DEFAULT_VERBOSITY = 0
+AM_V_GUILEC = $(AM_V_GUILEC_$(V))
+AM_V_GUILEC_ = $(AM_V_GUILEC_$(AM_DEFAULT_VERBOSITY))
+AM_V_GUILEC_0 = @echo "  GUILEC  " $@;
+GUILD = guild
+GUILEC_FLAGS =					\
+ --load-path=$(top-srcdir)			\
+ -Warity-mismatch				\
+ -Wformat					\
+ -Wunbound-variable
+%.go: %.scm
+	$(AM_V_GUILEC)GUILE_AUTO_COMPILE=0	\
+	$(GUILD) compile $(GUILEC_FLAGS) -o "$@" "$<"
 
 check:
 	$(SHELL) check.sh
@@ -358,7 +378,7 @@ update-hash: $(TARBALL)
 	sed -i 											\
 		-e 's,version #!mes!# "[^"]*"),version #!mes!# "$(VERSION)"),'			\
 		-e 's,(base32 #!mes!# "[^"]*"),(base32 #!mes!# "$(shell $(GUIX) hash $<)"),' 	\
-		guix/git/mes.scm
+		.guix/module/mes/packages/mes.scm
 else
 $(warning update-hash: no guix)
 endif
@@ -369,25 +389,21 @@ tag:
 # Release process
 #  0. Prepare git, see history:
 #     - doc: Release update (NEWS, etc.)
-#     - Generate announcement
-#       + touch mes-0.23.tar.gz
-#       + make gen-announce VERSION=0.23
-#       + Update and commit doc/announce/ANNOUNCE-0.23,
-#         using xxx (32,40) for checksums
-#     - create "Release 0.23" commit (see Release 0.22).
+#     - create "Release XXX" commit (see previous).
 #       + configure
 #       + configure.sh
 #  1. Tag for release
-#     make tag VERSION=0.23
+#     make tag
 #  2. Create signed tarball
-#     ./configure
 #     make sign-dist
 #  3. Update Guix package description
-#     make release
-#  4. Finish announcement
-#     - make sum-announce
+#     make guix-release
+#  4. Create announcement
+#     make gen-announce
 #     - doc: Post-release update.
 #     - build-aux/GNUMakefile.in: gen-announce: update previous-version
+#     - Fill doc/ANNOUNCE-XXX template (see previous)
+#       - Add guix pull && guix install
 #  5. Verify
 #     - Update package in Guix master.
 #     - If applicable, verify bootstrap.
@@ -397,7 +413,7 @@ tag:
 #     - Update ~/src/web/mes/index.html
 #     - Upload: cvs ci
 #  8. Create blog post
-#     cp doc/announce/ANNOUNCE-0.23 ~/src/web/joyofsource.com/posts/announce-0.23.md
+#     cp doc/announce/ANNOUNCE-XXX ~/src/web/joyofsource.com/posts/announce-XXX.md
 #     fix urls and all
 #  9. Send mail
 #     To: info-gnu@gnu.org
@@ -409,21 +425,20 @@ tag:
 guix-build:
 	./pre-inst-env $(GUIX) build mes@$(VERSION) --with-source=$(TARBALL)
 
-release: check-signature update-hash
+guix-release: check-signature update-hash
 	git commit -m 'guix: mes: Update to $(VERSION).'			\
-	    -m '* guix/git/mes.scm (mes)[source]: Update to $(VERSION).'	\
-	    guix/git/mes.scm
+	    -m '* .guix/module/mes/packages/mes.scm (mes)[source]: Update to $(VERSION).'	\
+	    .guix/module/mes/packages/mes.scm
 	git checkout ChangeLog
 
-GPG_KEY_ID:=1A858392E331EAFDB8C27FFBF3C1A0D9C1D65273
-GEN_ANNOUNCE=$(GNULIB)/build-aux/announce-gen
-GNULIB=../../gnulib
+GPG_KEY_ID:=$(shell git config user.signingkey)
+GEN_ANNOUNCE=$(GNULIB_SRCDIR)/build-aux/announce-gen
 gen-announce:
 	$(GEN_ANNOUNCE)					\
-	    --release-type=beta				\
+	    --release-type=stable			\
 	    --package-name=mes				\
-	    --previous-version='0.27'			\
-            --current-version=$(VERSION)		\
+	    --previous-version='0.28'			\
+	    --current-version=$(VERSION)		\
 	    --gpg-key-id=$(GPG_KEY_ID)			\
 	    --url-directory=https://ftp.gnu.org/gnu/mes	\
 	    --news=NEWS					\

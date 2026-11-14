@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2017,2022 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Stefan <stefan-guix@vodafonemail.de>
  *
  * This file is part of GNU Mes.
  *
@@ -57,6 +58,7 @@ struct timespec
 
 #define CLOCK_PROCESS_CPUTIME_ID 2
 int clock_gettime (clockid_t clk_id, struct timespec *tp);
+char *ctime (time_t const *time);
 struct tm *localtime (time_t const *timep);
 struct tm *gmtime (time_t const *time);
 time_t mktime (struct tm *broken_time);

@@ -17,18 +17,11 @@
 ;;; along with GNU Mes.  If not, see <http://www.gnu.org/licenses/>.
 
 (cond-expand
- (guile
-  (define closure identity))
+ (guile)
  (mes
   (define display core:display)
   (define write core:write)
-  (define (newline) (display "\n"))
-  (define (cadr x) (car (cdr x)))
-  (define (map f lst)
-    (if (null? lst) (list)
-        (cons (f (car lst)) (map f (cdr lst)))))
-  (define (closure x)
-    (map car (cdr (core:cdr (core:car (core:cdr x))))))))
+  (define (newline) (display "\n"))))
 
 (define (x t) #t)
 (define (xx x1 x2)
@@ -45,14 +38,3 @@
 (display "xx:")
 (display xx)
 (newline)
-
-(display "closure:")
-(display closure)
-(newline)
-(display "closure xx:")
-(write (closure xx))
-(display "\n")
-(xx 0 1)
-(display " => closure xx:")
-(write (closure xx))
-(display "\n")

@@ -22,9 +22,7 @@ set -e
 
 MES_ARENA=${MES_ARENA-20000000}
 export MES_ARENA
-MES_MAX_ARENA=${MES_MAX_ARENA-${MES_ARENA}}
-export MES_MAX_ARENA
-MES_STACK=${MES_STACK-5000000}
+MES_STACK=${MES_STACK-50000}
 export MES_STACK
 
 . ./config.sh
@@ -75,6 +73,11 @@ export recheck
 ./pre-inst-env ${SHELL} ${srcdest}build-aux/check-boot.sh
 ./pre-inst-env ${SHELL} ${srcdest}build-aux/check-mes.sh
 
+if test $bootstrap = true; then
+    AM_CFLAGS="-L ${srcdest}lib -L $mes_cpu-mes"
+    export AM_CFLAGS AM_CPPFLAGS
+fi
+
 if test $compiler = gcc; then
     (
         cd gcc-lib
@@ -87,6 +90,7 @@ if test $compiler = gcc; then
 -I ../include
 -I include
 "
+        AM_CFLAGS="-fno-builtin -nostartfiles -nostdlib $AM_CFLAGS"
         MES_CHECKING_BUILTIN_LIBS="-l gcc"
         export MES_CHECKING_BUILTIN_LIBS
         ../pre-inst-env ${SHELL} ${srcdest}build-aux/check-mescc.sh

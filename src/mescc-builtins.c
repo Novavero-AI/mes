@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2022,2023 Timothy Sample <samplet@ngyro.com>
+ * Copyright © 2026 Ekaitz Zarraga <ekaitz@elenq.tech>
  *
  * This file is part of GNU Mes.
  *
@@ -21,25 +22,25 @@
 /* NOTE: This file gets included directly into the body of the
    'mes_builtins' procedure.  */
 
-a = init_builtin (builtin_type, "getpid", 0, &getpid_, a);
-a = init_builtin (builtin_type, "environ", -1, &environ_, a);
-a = init_builtin (builtin_type, "opendir", 1, &opendir_, a);
-a = init_builtin (builtin_type, "closedir", 1, &closedir_, a);
-a = init_builtin (builtin_type, "readdir", 1, &readdir_, a);
-a = init_builtin (builtin_type, "pipe", 0, &pipe_, a);
-a = init_builtin (builtin_type, "close-port", 1, &close_port, a);
-a = init_builtin (builtin_type, "seek", 3, &seek, a);
-a = init_builtin (builtin_type, "chdir", 1, &chdir_, a);
-a = init_builtin (builtin_type, "stat", -1, &stat_, a);
-a = init_builtin (builtin_type, "lstat", -1, &lstat_, a);
-a = init_builtin (builtin_type, "rename-file", 2, &rename_file, a);
-a = init_builtin (builtin_type, "mkdir", 1, &mkdir_, a);
-a = init_builtin (builtin_type, "rmdir", 1, &rmdir_, a);
-a = init_builtin (builtin_type, "link", 2, &link_, a);
-a = init_builtin (builtin_type, "symlink", 2, &symlink_, a);
-a = init_builtin (builtin_type, "umask", -1, &umask_, a);
-a = init_builtin (builtin_type, "utime", 3, &utime_, a);
-a = init_builtin (builtin_type, "sleep", 1, &sleep_, a);
+a = init_builtin (&index, "getpid", 0, &getpid_, a);
+a = init_builtin (&index, "environ", -1, &environ_, a);
+a = init_builtin (&index, "opendir", 1, &opendir_, a);
+a = init_builtin (&index, "closedir", 1, &closedir_, a);
+a = init_builtin (&index, "readdir", 1, &readdir_, a);
+a = init_builtin (&index, "pipe", 0, &pipe_, a);
+a = init_builtin (&index, "close-port", 1, &close_port, a);
+a = init_builtin (&index, "seek", 3, &seek, a);
+a = init_builtin (&index, "chdir", 1, &chdir_, a);
+a = init_builtin (&index, "stat", -1, &stat_, a);
+a = init_builtin (&index, "lstat", -1, &lstat_, a);
+a = init_builtin (&index, "rename-file", 2, &rename_file, a);
+a = init_builtin (&index, "mkdir", 1, &mkdir_, a);
+a = init_builtin (&index, "rmdir", 1, &rmdir_, a);
+a = init_builtin (&index, "link", 2, &link_, a);
+a = init_builtin (&index, "symlink", 2, &symlink_, a);
+a = init_builtin (&index, "umask", -1, &umask_, a);
+a = init_builtin (&index, "utime", 3, &utime_, a);
+a = init_builtin (&index, "sleep", 1, &sleep_, a);
 
 a = acons (cstring_to_symbol ("O_RDWR"), make_number (O_RDWR), a);
 a = acons (cstring_to_symbol ("O_EXCL"), make_number (O_EXCL), a);

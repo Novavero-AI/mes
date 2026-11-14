@@ -249,6 +249,9 @@
           ((#:u-format ,global) (guard (global? global))
            (riscv:u-format (global->string global)))
 
+          ((#:init-null ,size) (guard (number? size))
+           (string-append "<" (number->string size)))
+
           (_ (error "text->M1 no match o" o))))
        ((pair? o) (string-join (map text->M1 o)))
        (#t (error "no such text:" o))))

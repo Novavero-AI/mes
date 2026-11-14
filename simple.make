@@ -38,8 +38,8 @@ M2_PLANET_FLAGS = --debug --architecture $(M2_PLANET_ARCH) -D __linux__=1 -D __$
 
 CFLAGS:=					\
   $(CFLAGS)					\
+ -std=c99					\
  -D _GNU_SOURCE					\
- -D const=					\
  -ggdb						\
  -D SYSTEM_LIBC=1				\
  -D 'MES_VERSION="git"'				\
@@ -60,19 +60,18 @@ LIBMES_SOURCES =				\
  src/posix.c					\
  src/reader.c					\
  src/string.c					\
- src/stack.c					\
  src/struct.c					\
  src/symbol.c					\
  src/variable.c					\
+ src/compiler.c					\
  src/vector.c
 
 MES_SOURCES =					\
  $(LIBMES_SOURCES)				\
  src/mes.c
 
-TEST_GC_SOURCES =				\
- $(LIBMES_SOURCES)				\
- src/test/gc.c
+MES_SOURCES_M2 =				\
+ $(MES_SOURCES)
 
 M2_SOURCES =					\
  lib/linux/$(M2_PLANET_ARCH)-mes-m2/crt1.c	\
@@ -168,7 +167,6 @@ GCC_SOURCES =					\
  lib/mes/itoa.c					\
  lib/mes/ltoa.c					\
  lib/mes/assert_msg.c				\
- src/cc.c					\
  src/globals.c
 
 mes-gcc: bin/mes-gcc
@@ -180,9 +178,6 @@ gc-m2: bin/gc-m2
 bin/mes-gcc: simple.make $(GCC_SOURCES) $(MES_SOURCES) $(INCLUDES) | bin
 	$(CC) $(CFLAGS) -o $@ $(GCC_SOURCES) $(MES_SOURCES)
 	cp -f $@ bin/mes
-
-bin/gc-gcc: simple.make $(GCC_SOURCES) $(TEST_GC_SOURCES) $(INCLUDES) | bin
-	$(CC) $(CFLAGS) -D GC_TEST=1 -o $@ $(GCC_SOURCES) $(TEST_GC_SOURCES)
 
 M2_PLANET_INCLUDES =				\
  include/mes/config.h				\
@@ -196,9 +191,9 @@ M2_PLANET_INCLUDES =				\
  include/m2/types.h				\
  include/sys/types.h				\
  include/sys/utsname.h				\
+ include/mes/constants.h			\
  include/mes/mes.h				\
  include/mes/builtins.h				\
- include/mes/constants.h			\
  include/mes/symbols.h				\
  include/linux/m2/kernel-stat.h			\
  include/sys/stat.h				\
@@ -211,8 +206,8 @@ M2_PLANET_SOURCES =				\
  $(M2_PLANET_INCLUDES:%.h=%.h)			\
  $(M2_SOURCES)
 
-m2/mes.M1: simple.make $(M2_PLANET_SOURCES) $(MES_SOURCES) $(M2_PLANET_INCLUDES) | m2
-	$(M2_PLANET) $(M2_PLANET_FLAGS) $(M2_PLANET_SOURCES:%=-f %)  $(MES_SOURCES:%.c=-f %.c) -o $@ || rm -f $@
+m2/mes.M1: simple.make $(M2_PLANET_SOURCES) $(MES_SOURCES_M2) $(M2_PLANET_INCLUDES) | m2
+	$(M2_PLANET) $(M2_PLANET_FLAGS) $(M2_PLANET_SOURCES:%=-f %)  $(MES_SOURCES_M2:%.c=-f %.c) -o $@ || rm -f $@
 
 m2/mes.blood-elf.M1: m2/mes.M1 | m2
 	blood-elf --little-endian -f $< -o $@
@@ -258,13 +253,13 @@ check-base: $(MES)
 	MES_DEBUG=4 MES_PREFIX=mes MES=$(MES) tests/base.test
 
 check-gc: $(MES)
-	MES_DEBUG=3 MES_ARENA=10000 MES_MAX_ARENA=10000 MES_BOOT=tests/gc.test $(MES)
+	MES_DEBUG=3 MES_ARENA=40000 MES_BOOT=boot.scm $(MES) < tests/gc.test
 
 check-mescc: $(MES)
 	rm -f a.out
 # this already needs succesful GC
 #	LIBRARY_PATH=lib MES_DEBUG=1 MES_PREFIX=mes MES=$(MES) sh -x scripts/mescc -- -I include -nostdlib lib/mes/globals.c lib/string/strlen.c lib/mes/eputs.c scaffold/hello.c
-	LIBRARY_PATH=lib MES_DEBUG=1 MES_PREFIX=mes MES=$(MES) sh -x scripts/mescc -- -m 32 -I include -nostdlib lib/mes/globals.c lib/linux/$(MESCC_CPU)-mes-mescc/crt1.c scaffold/main.c
+	LIBRARY_PATH=lib MES_DEBUG=1 MES_PREFIX=mes MES=$(MES) sh -x scripts/mescc -- -m 32 -I include -nostdlib lib/mes/globals.c lib/mes/__init_io.c lib/linux/$(MESCC_CPU)-mes-mescc/crt1.c scaffold/main.c
 	./a.out; r=$$?; if [ $$r != 42 ]; then exit 1; fi
 
 

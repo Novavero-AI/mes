@@ -1,6 +1,7 @@
 /* -*-comment-start: "//";comment-end:""-*-
  * GNU Mes --- Maxwell Equations of Software
  * Copyright © 2017 Jan (janneke) Nieuwenhuizen <janneke@gnu.org>
+ * Copyright © 2025 Stefan <stefan-guix@vodafonemail.de>
  *
  * This file is part of GNU Mes.
  *
@@ -169,22 +170,25 @@ struct sigaction
 
 #include <arch/signal.h>
 
-int kill (pid_t pid, int signum);
-int raise (int);
-int sigaction (int signum, struct sigaction const *act, struct sigaction *oldact);
-int sigaddset (sigset_t * set, int signum);
-#if __MESC__
-void *signal (int signum, void *action);
-#else
-sighandler_t signal (int signum, sighandler_t action);
-#endif
-int sigemptyset (sigset_t * set);
 #ifndef SIG_BLOCK
 #define SIG_BLOCK 0
 #define SIG_UNBLOCK 1
 #define SIG_SETMASK 2
 #endif
+
+int kill (pid_t pid, int signum);
+int raise (int);
+int sigaction (int signum, struct sigaction const *act, struct sigaction *oldact);
+int sigaddset (sigset_t * set, int signum);
+int sigblock (int mask);
+int sigemptyset (sigset_t * set);
+#if __MESC__
+void *signal (int signum, void *action);
+#else
+sighandler_t signal (int signum, sighandler_t action);
+#endif
 int sigprocmask (int how, sigset_t const *set, sigset_t * oldset);
+int sigsetmask (int x);
 
 #endif // !__M2__
 

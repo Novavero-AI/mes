@@ -1,9 +1,9 @@
 #! /bin/sh
 
 # GNU Mes --- Maxwell Equations of Software
-# Copyright © 2017,2018,2019,2020,2022,2023,2024 Janneke Nieuwenhuizen <janneke@gnu.org>
+# Copyright © 2017,2018,2019,2020,2022,2023,2024,2026 Janneke Nieuwenhuizen <janneke@gnu.org>
 # Copyright © 2023, 2024 Andrius Štikonas <andrius@stikonas.eu>
-# Copyright © 2023, 2024 Ekaitz Zarraga <ekaitz@elenq.tech>
+# Copyright © 2023, 2024,2026 Ekaitz Zarraga <ekaitz@elenq.tech>
 # Copyright © 2024 Michael Forney <mforney@mforney.org>
 #
 # This file is part of GNU Mes.
@@ -160,6 +160,7 @@ lib/tests/scaffold/74-multi-line-string.c
 lib/tests/scaffold/75-struct-union.c
 lib/tests/scaffold/76-pointer-arithmetic-pp.c
 lib/tests/scaffold/76-pointer-arithmetic.c
+lib/tests/scaffold/76-pointer-arithmetic-ptr-diff.c
 lib/tests/scaffold/77-pointer-assign.c
 lib/tests/scaffold/78-union-struct.c
 lib/tests/scaffold/79-int-array-simple.c
@@ -284,6 +285,8 @@ lib/tests/signal/90-signal.c
 
     if test $mes_cpu = riscv64; then
         xfail_tests="$xfail_tests
+lib/tests/scaffold/16-cast.c
+lib/tests/scaffold/17-compare-unsigned-le.c
 lib/tests/scaffold/17-compare-rotated.c
 "
     fi
